@@ -2029,6 +2029,40 @@
                 </div>
             </div>
 
+            <div class="collapsible open" id="panneauRatiosPerformance" style="display:none;">
+                <button class="collapsible-header" onclick="toggleCollapsible(this)">
+                    <span>Ratios de Performance Ajustée au Risque</span>
+                    <span class="collapsible-chevron">▾</span>
+                </button>
+                <div class="collapsible-content">
+                    <p style="font-size:0.78rem; color:var(--text-muted); margin:0 0 16px; line-height:1.5;">
+                        Calculés sur les rendements journaliers agrégés, avec un taux sans risque de 0% (convention usuelle pour l'analyse de stratégies actives). L'annualisation utilise la fréquence de trading réelle de cette stratégie <span id="ratiosFrequenceTxt">--</span>, pas un forfait générique.
+                    </p>
+                    <div class="metric-row-4">
+                        <div class="mc-info-card">
+                            <div class="mc-info-title">Sharpe Ratio</div>
+                            <div class="mc-info-val" id="ratioSharpe">--</div>
+                        </div>
+                        <div class="mc-info-card">
+                            <div class="mc-info-title">Sortino Ratio</div>
+                            <div class="mc-info-val" id="ratioSortino">--</div>
+                        </div>
+                        <div class="mc-info-card">
+                            <div class="mc-info-title">Calmar Ratio</div>
+                            <div class="mc-info-val" id="ratioCalmar">--</div>
+                        </div>
+                        <div class="mc-info-card">
+                            <div class="mc-info-title">Rendement Annualisé</div>
+                            <div class="mc-info-val" id="ratioRendementAnnualise">--</div>
+                        </div>
+                    </div>
+                    <p id="ratioCalmarSourceTxt" style="font-size:0.72rem; color:var(--text-muted); margin:10px 0 0;"></p>
+                    <div id="ratiosDonneesManuellesBloc" style="display:none; margin-top:18px; padding-top:18px; border-top:1px solid var(--ash);">
+                        <div class="metric-row-4" id="ratiosDonneesManuellesGrid"></div>
+                    </div>
+                </div>
+            </div>
+
             <div class="collapsible open">
                 <button class="collapsible-header" onclick="toggleCollapsible(this)">
                     <span>Courbe d'Équité Complète</span>
@@ -3651,6 +3685,41 @@
                 document.getElementById('globalPf').textContent = g.profit_factor;
                 document.getElementById('globalNTrades').textContent = g.n_trades;
             }
+            const panneauRatios = document.getElementById('panneauRatiosPerformance');
+            const perfRatios = data.ratios_performance;
+            if (perfRatios) {
+                panneauRatios.style.display = 'block';
+                document.getElementById('ratiosFrequenceTxt').textContent = `(${perfRatios.n_jours_actifs} jours actifs, soit ${perfRatios.jours_actifs_par_an}/an en moyenne)`;
+                document.getElementById('ratioSharpe').textContent = perfRatios.sharpe_ratio !== null ? perfRatios.sharpe_ratio : 'N/D';
+                document.getElementById('ratioSortino').textContent = perfRatios.sortino_ratio !== null ? perfRatios.sortino_ratio : 'N/D';
+                document.getElementById('ratioCalmar').textContent = perfRatios.calmar_ratio !== null ? perfRatios.calmar_ratio : 'N/D';
+                document.getElementById('ratioRendementAnnualise').textContent = perfRatios.rendement_annualise_pct !== null ? perfRatios.rendement_annualise_pct + ' %' : 'N/D';
+                const sourceTxt = perfRatios.dd_source === 'manuel'
+                    ? `Calmar calculé avec le Max Equity Drawdown que vous avez saisi (${perfRatios.dd_utilise_pour_calmar_pct}%).`
+                    : `Calmar calculé avec le drawdown estimé par XTRUNN à partir des trades clôturés (${perfRatios.dd_utilise_pour_calmar_pct}%) — saisissez le vrai Max Equity Drawdown dans les Réglages Complémentaires pour plus de précision.`;
+                document.getElementById('ratioCalmarSourceTxt').textContent = sourceTxt;
+
+                const blocManuel = document.getElementById('ratiosDonneesManuellesBloc');
+                const grilleManuelle = document.getElementById('ratiosDonneesManuellesGrid');
+                let cartesManuelles = '';
+                if (perfRatios.excess_return_vs_benchmark_pct !== null) {
+                    const positif = perfRatios.excess_return_vs_benchmark_pct >= 0;
+                    cartesManuelles += `<div class="mc-info-card"><div class="mc-info-title">Vs Benchmark</div><div class="mc-info-val ${positif ? 'positive' : 'negative'}">${positif ? '+' : ''}${perfRatios.excess_return_vs_benchmark_pct} %</div></div>`;
+                }
+                if (perfRatios.profit_net_reel_apres_couts !== null) {
+                    const positif = perfRatios.profit_net_reel_apres_couts >= 0;
+                    cartesManuelles += `<div class="mc-info-card"><div class="mc-info-title">Profit Net Réel (après coûts saisis)</div><div class="mc-info-val ${positif ? 'positive' : 'negative'}">${perfRatios.profit_net_reel_apres_couts} ${deviseSymbole}</div></div>`;
+                }
+                if (cartesManuelles) {
+                    grilleManuelle.innerHTML = cartesManuelles;
+                    blocManuel.style.display = 'block';
+                } else {
+                    blocManuel.style.display = 'none';
+                }
+            } else {
+                panneauRatios.style.display = 'none';
+            }
+
             const periodeEl = document.getElementById('globalPeriodeTxt');
             if (data.couverture_temporelle) {
                 const ct = data.couverture_temporelle;
