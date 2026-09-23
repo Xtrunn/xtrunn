@@ -1782,12 +1782,21 @@
             </div>
         </div>
 
-        <div class="orbit-score-mini" id="orbitScoreMini" style="display:none;">
-            <svg class="orbit-ring-mini" viewBox="0 0 30 30">
-                <circle cx="15" cy="15" r="12" fill="none" stroke="var(--ash)" stroke-width="3"></circle>
-                <circle id="orbitRingMiniArc" cx="15" cy="15" r="12" fill="none" stroke="var(--horizon)" stroke-width="3" stroke-linecap="round" stroke-dasharray="75.4" stroke-dashoffset="75.4" transform="rotate(-90 15 15)"></circle>
-            </svg>
-            <span>Score <span class="val" id="orbitScoreVal">--</span>/100</span>
+        <div class="orbit-scores-groupe" id="orbitScoresGroupe" style="display:none; align-items:center; gap:22px; justify-self:center;">
+            <div class="orbit-score-mini" id="orbitScoreMini">
+                <svg class="orbit-ring-mini" viewBox="0 0 30 30">
+                    <circle cx="15" cy="15" r="12" fill="none" stroke="var(--ash)" stroke-width="3"></circle>
+                    <circle id="orbitRingMiniArc" cx="15" cy="15" r="12" fill="none" stroke="var(--horizon)" stroke-width="3" stroke-linecap="round" stroke-dasharray="75.4" stroke-dashoffset="75.4" transform="rotate(-90 15 15)"></circle>
+                </svg>
+                <span>Robustesse <span class="val" id="orbitScoreVal">--</span>/100</span>
+            </div>
+            <div class="orbit-score-mini" id="orbitScoreMiniQualite" style="display:none;">
+                <svg class="orbit-ring-mini" viewBox="0 0 30 30">
+                    <circle cx="15" cy="15" r="12" fill="none" stroke="var(--ash)" stroke-width="3"></circle>
+                    <circle id="orbitRingMiniArcQualite" cx="15" cy="15" r="12" fill="none" stroke="var(--horizon)" stroke-width="3" stroke-linecap="round" stroke-dasharray="75.4" stroke-dashoffset="75.4" transform="rotate(-90 15 15)"></circle>
+                </svg>
+                <span>Qualité <span class="val" id="orbitScoreValQualite">--</span>/100</span>
+            </div>
         </div>
 
         <button class="parametres-btn" id="parametresBtn" onclick="ouvrirParametres()" title="Paramètres">
@@ -3819,6 +3828,15 @@
 
             document.getElementById('scoreGlobal').textContent = scoreGlobal;
             mettreAJourAnneauScore(scoreGlobal);
+
+            const qualite = data.qualite_performance;
+            const miniQualite = document.getElementById('orbitScoreMiniQualite');
+            if (qualite) {
+                miniQualite.style.display = 'flex';
+                mettreAJourAnneauScoreQualite(qualite.score);
+            } else {
+                miniQualite.style.display = 'none';
+            }
 
             // Doit rester synchronisé avec SEUIL_SCORE_VALIDATION côté
             // backend (api.py) -- le serveur reste la seule source
@@ -6413,7 +6431,17 @@
             miniArc.setAttribute('stroke-dashoffset', miniCirc * (1 - pct));
             miniArc.style.stroke = score >= 70 ? 'var(--horizon)' : (score >= 40 ? 'var(--warning)' : 'var(--danger)');
             document.getElementById('orbitScoreVal').textContent = score;
-            document.getElementById('orbitScoreMini').style.display = 'flex';
+            document.getElementById('orbitScoresGroupe').style.display = 'flex';
+        }
+
+        function mettreAJourAnneauScoreQualite(score) {
+            const pct = Math.max(0, Math.min(100, score)) / 100;
+            const miniArc = document.getElementById('orbitRingMiniArcQualite');
+            const miniCirc = 2 * Math.PI * 12;
+            miniArc.setAttribute('stroke-dasharray', miniCirc);
+            miniArc.setAttribute('stroke-dashoffset', miniCirc * (1 - pct));
+            miniArc.style.stroke = score >= 70 ? 'var(--horizon)' : (score >= 40 ? 'var(--warning)' : 'var(--danger)');
+            document.getElementById('orbitScoreValQualite').textContent = score;
         }
 
         // ============================================================
@@ -7972,7 +8000,7 @@
             document.getElementById('railToggle').style.display = 'none';
             document.getElementById('epreuveRailNav').style.display = 'none';
             document.getElementById('backToApproach').style.display = 'none';
-            document.getElementById('orbitScoreMini').style.display = 'none';
+            document.getElementById('orbitScoresGroupe').style.display = 'none';
             document.getElementById('approachScreen').classList.remove('aspire');
             document.body.classList.remove('etat-inside', 'etat-epreuve');
             document.body.classList.add('etat-approach');
@@ -8020,7 +8048,7 @@
             document.getElementById('railToggle').style.display = 'none';
             document.getElementById('epreuveRailNav').style.display = 'flex';
             document.getElementById('backToApproach').style.display = 'flex';
-            document.getElementById('orbitScoreMini').style.display = 'none';
+            document.getElementById('orbitScoresGroupe').style.display = 'none';
             masquerSelecteurs();
             document.body.classList.remove('etat-approach', 'etat-inside');
             document.body.classList.add('etat-epreuve');
