@@ -1901,6 +1901,77 @@ def normaliser_integrite_import(trades_array, details_list, dayfirst_default=Non
 # PARSING MT5
 # ============================================================
 
+def _classifier_semantique_pnl(col_profit, plateforme=None):
+    """Décrit la sémantique probable de la colonne P&L sans la présenter comme une certitude broker.
+
+    La sélection du champ reste basée sur le fichier réellement fourni. Cette fonction
+    sert uniquement à rendre explicite ce que Xtrunn sait / ne sait pas du P&L et de ses coûts.
+    """
+    col = str(col_profit or "").strip().lower()
+    p = str(plateforme or "").strip().lower()
+    if p == "freqtrade" or "profit_abs" in col:
+        return {"source": col_profit, "nature": "net_probable", "couts_deja_inclus": "probable",
+                "preuve": "schéma natif Freqtrade / profit_abs", "certitude": "format_plateforme"}
+    if any(k in col for k in ("net profit", "net pnl", "net p&l")) or col == "net" or col.startswith("net "):
+        return {"source": col_profit, "nature": "net", "couts_deja_inclus": "probable",
+                "preuve": "nom_de_colonne", "certitude": "nom_champ"}
+    if "gross" in col:
+        return {"source": col_profit, "nature": "brut", "couts_deja_inclus": "non",
+                "preuve": "nom_de_colonne", "certitude": "nom_champ"}
+    return {"source": col_profit, "nature": "profit_non_qualifie", "couts_deja_inclus": "inconnu",
+            "preuve": "nom_de_colonne", "certitude": "insuffisante"}
+
+
+def _choisir_colonne_profit(columns, prefer_net=True, allow_gross=True):
+    """Choisit une colonne de P&L par trade, sans confondre une métrique de résumé.
+
+    Les exports de plateformes peuvent contenir dans le même tableau des
+    colonnes telles que ``Profit Factor``, ``Cumulative Profit`` ou
+    ``Total Net Profit``. Elles contiennent le mot ``profit`` mais ne sont
+    pas un P&L individuel par trade. Elles doivent donc être exclues avant
+    le classement des vrais champs P&L.
+    """
+    cols = [str(c).strip().lower() for c in columns]
+    exclues = (
+        "commission", "commissions", "swap", "fee", "fees", "frais", "tax",
+        "%", "percent", "pourcent",
+        "profit factor", "profit-factor", "profitfactor",
+        "cumulative profit", "cumulative pnl", "cumulative p&l",
+        "total profit", "total pnl", "total p&l", "total net profit",
+        "average profit", "avg profit", "mean profit",
+        "max profit", "maximum profit", "min profit", "minimum profit",
+        "profit ratio", "profit/risk", "profit risk",
+        "expectancy", "payoff ratio", "win/loss ratio",
+    )
+    candidates = []
+    for col in cols:
+        if any(x in col for x in exclues):
+            continue
+        # Champs explicitement nets : priorité maximale.
+        if col in ("net", "net pnl", "net p&l", "net profit"):
+            candidates.append((0, col))
+        elif prefer_net and any(k in col for k in ("net pnl", "net p&l", "net profit")):
+            candidates.append((1, col))
+        # Champs génériques de P&L par trade.
+        elif col in ("profit", "pnl", "p&l", "profit/loss", "profit loss"):
+            candidates.append((2, col))
+        elif any(k in col for k in ("profit", "pnl", "p&l")):
+            candidates.append((3, col))
+        elif prefer_net and "net" in col and not any(x in col for x in ("factor", "ratio")):
+            candidates.append((4, col))
+        elif allow_gross and col in ("gross", "gross pnl", "gross p&l", "gross profit"):
+            candidates.append((5, col))
+        elif allow_gross and "gross" in col and "profit" in col:
+            candidates.append((6, col))
+    if not candidates:
+        return None
+    return min(candidates, key=lambda x: x[0])[1]
+
+
+# ============================================================
+# PARSING MT5
+# ============================================================
+
 def lire_trades_mt5(contents, filename):
     """
     Retourne (trades_array, trades_detail, erreur).
@@ -1928,7 +1999,7 @@ def lire_trades_mt5(contents, filename):
     ligne_entete = None
     for index, row in df_raw.iterrows():
         row_str = " ".join([str(val).strip().lower() for val in row.values])
-        if 'profit' in row_str and ('heure' in row_str or 'opération' in row_str or 'ticket' in row_str):
+        if 'profit' in row_str and ('heure' in row_str or 'time' in row_str or 'date' in row_str or 'opération' in row_str or 'ticket' in row_str or 'deal' in row_str or 'order' in row_str):
             ligne_entete = index
             break
 
@@ -1947,22 +2018,31 @@ def lire_trades_mt5(contents, filename):
 
     df.columns = [str(col).strip().lower() for col in df.columns]
 
-    col_profit = None
+    col_profit = _choisir_colonne_profit(df.columns, prefer_net=True, allow_gross=True)
     col_dir = None
+    col_entry = None
     col_date = None
     col_ticket = None
+    col_deal = None
+    col_position = None
     col_volume = None
     col_sl, col_tp, col_open_price = None, None, None
     col_symbole = None
     for col in df.columns:
-        if 'profit' in col and col_profit is None:
-            col_profit = col
-        if ('direction' in col or 'type' in col) and col_dir is None:
+        if ('direction' in col or 'type' in col or col == 'side') and col_dir is None:
             col_dir = col
-        if any(k in col for k in ['heure', 'time', 'date']) and col_date is None:
+        if any(k in col for k in ['entry', 'entrée', 'entree']) and col_entry is None:
+            col_entry = col
+        if any(k in col for k in ['closing time', 'close time', 'heure de clôture', 'heure de cloture', 'date de clôture', 'date de cloture', 'exit time', 'closing date']) and col_date is None:
+            col_date = col
+        elif any(k in col for k in ['heure', 'time', 'date']) and col_date is None:
             col_date = col
         if any(k in col for k in ['ticket', 'order', '#']) and col_ticket is None:
             col_ticket = col
+        if 'deal' in col and col_deal is None:
+            col_deal = col
+        if 'position' in col and 'id' in col and col_position is None:
+            col_position = col
         if any(k in col for k in ['volume', 'lots', 'lot']) and col_volume is None:
             col_volume = col
         if any(k in col for k in ['s/l', 's / l', 'stop loss']) and col_sl is None:
@@ -1984,21 +2064,79 @@ def lire_trades_mt5(contents, filename):
                 break
 
     if not col_profit:
-        return None, None, "Colonne 'Profit' introuvable dans le rapport MT5."
+        return None, None, "Colonne de P&L introuvable dans le rapport MT5. Recherchez une colonne 'Net', 'Profit' ou 'P&L'."
 
     df_clean = df.copy()
-    df_clean[col_profit] = pd.to_numeric(df_clean[col_profit], errors='coerce')
+    df_clean[col_profit] = df_clean[col_profit].apply(extraire_nombre)
     df_clean = df_clean.dropna(subset=[col_profit])
 
-    if col_dir:
-        df_clean[col_dir] = df_clean[col_dir].astype(str).str.lower()
-        mask = df_clean[col_dir].str.contains('out', na=False)
-        if mask.sum() == 0:
-            mask = df_clean[col_profit] != 0
-    else:
-        mask = df_clean[col_profit] != 0
+    # MT5 peut exporter plusieurs granularités : ordres, deals/exécutions,
+    # ou historique de positions. Le profit exploitable doit venir des
+    # lignes de sortie/fermeture, pas des entrées ni des lignes récapitulatives.
+    # On privilégie les marqueurs explicites quand ils existent.
+    df_trades = df_clean
+    granularite = 'inconnue'
+    filtre_mode = 'pnl_numerique'
 
-    df_trades = df_clean[mask]
+    if col_entry:
+        entry_txt = df_clean[col_entry].astype(str).str.strip().str.lower()
+        mask_out = entry_txt.str.contains(r'out|close|sortie|clôture|cloture', na=False, regex=True)
+        mask_in = entry_txt.str.contains(r'in|entry|entrée|entree', na=False, regex=True)
+        if mask_out.any():
+            df_trades = df_clean[mask_out]
+            granularite = 'deal'
+            filtre_mode = 'entry_out'
+        elif mask_in.any() and (mask_in.sum() < len(df_clean)):
+            df_trades = df_clean[~mask_in]
+            granularite = 'deal'
+            filtre_mode = 'entry_non_in'
+        else:
+            granularite = 'deal_ambigu'
+
+    # Les rapports MT5 peuvent contenir des lignes de total/balance dans
+    # le même tableau. Dans un export de deals, un Deal numérique + un
+    # symbole non vide constituent un marqueur structurel fiable d'une
+    # exécution réelle ; les lignes de résumé n'ont généralement pas ces
+    # deux attributs.
+    if col_deal and col_symbole:
+        deal_num = df_trades[col_deal].apply(extraire_nombre)
+        symbole_ok = df_trades[col_symbole].notna() & (df_trades[col_symbole].astype(str).str.strip() != '')
+        df_trades = df_trades[deal_num.notna() & symbole_ok]
+
+    if col_dir and len(df_trades) == len(df_clean):
+        type_txt = df_clean[col_dir].astype(str).str.strip().str.lower()
+        mask_out_type = type_txt.str.contains(r'out|close|sortie|clôture|cloture', na=False, regex=True)
+        # Sur un historique de deals MT5, Type peut contenir buy/sell sans
+        # distinguer l'entrée. Si des lignes OUT existent, elles sont les
+        # clôtures économiques. Les lignes balance/deposit/etc. sont exclues.
+        mask_non_trade = type_txt.str.contains(r'balance|credit|deposit|withdraw|charge|commission|bonus|transfer|dividend|correction', na=False, regex=True)
+        if mask_out_type.any():
+            df_trades = df_clean[mask_out_type & ~mask_non_trade]
+            granularite = 'deal'
+            filtre_mode = 'type_out'
+        elif mask_non_trade.any():
+            df_trades = df_clean[~mask_non_trade]
+            filtre_mode = 'type_non_balance'
+
+    # Une colonne Order/Deal/Position seule ne suffit pas à déterminer la
+    # granularité. On ne déduplique donc pas par identifiant : les clôtures
+    # partielles peuvent partager un même ordre/position. On retire seulement
+    # les doublons strictement identiques (ticket + P&L + date).
+    col_id_dedupe = col_deal or col_ticket or col_position
+    df_trades, doublons_exacts = _dedoublonner_trades_exacts(
+        df_trades, col_profit, col_id_dedupe, col_date
+    )
+
+    # Si l'export ressemble à un historique de deals mais ne fournit aucun
+    # marqueur d'entrée/sortie exploitable, il est dangereux d'assimiler
+    # chaque ligne buy/sell à un trade clôturé : une entrée peut être comptée
+    # comme un résultat. On refuse alors l'import plutôt que de fabriquer un
+    # historique faux. Un rapport de positions/trades explicite n'est pas
+    # concerné par ce garde-fou.
+    if col_deal and granularite in {'inconnue', 'deal_ambigu'} and col_entry is None and col_dir:
+        type_txt_final = df_trades[col_dir].astype(str).str.strip().str.lower()
+        if type_txt_final.str.contains(r'^(?:buy|sell|achat|vente)$', na=False, regex=True).all():
+            return None, None, "Export MT5 de type 'deals' détecté mais les marqueurs d'entrée/sortie sont absents ou ambigus. Exportez l'historique avec la colonne 'Entry' (In/Out) afin d'éviter de compter une entrée comme un trade clôturé."
 
     if len(df_trades) < MIN_TRADES_ABSOLUTE:
         return None, None, f"Pas assez de trades valides trouvés (minimum {MIN_TRADES_ABSOLUTE} requis)."
@@ -2022,6 +2160,14 @@ def lire_trades_mt5(contents, filename):
             "open_price": round(float(open_price), 5) if not pd.isna(open_price) and open_price != 0 else None,
             "symbole": str(row[col_symbole]).strip() if col_symbole and pd.notna(row[col_symbole]) else None,
         })
+    pnl_semantique = _classifier_semantique_pnl(col_profit if 'col_profit' in locals() else 'profit_abs', "mt5")
+    for _d in trades_detail:
+        _d["pnl_source"] = pnl_semantique["source"]
+        _d["pnl_nature"] = pnl_semantique["nature"]
+        _d["pnl_couts_deja_inclus"] = pnl_semantique["couts_deja_inclus"]
+        _d["mt5_granularite"] = granularite
+        _d["mt5_filtre_execution"] = filtre_mode
+        _d["mt5_doublons_exacts_supprimes"] = doublons_exacts
 
     return trades_filtres, trades_detail, None
 
@@ -2033,12 +2179,61 @@ def lire_trades_mt5(contents, filename):
 # milliers, %) selon la plateforme d'export.
 # ============================================================
 
+def _dedoublonner_trades_exacts(df, col_profit, col_ticket=None, col_date=None):
+    """Supprime uniquement les doublons manifestement identiques.
+
+    On ne fusionne JAMAIS deux lignes partageant seulement le même ticket :
+    un même identifiant peut légitimement apparaître plusieurs fois lors
+    d'une exécution/fermeture partielle. Le dédoublonnage est volontairement
+    conservateur et ne s'applique que lorsque les champs disponibles sont
+    identiques ligne pour ligne (ticket + profit + date si disponible).
+    """
+    if df.empty or col_ticket is None or col_ticket not in df.columns:
+        return df, 0
+    subset = [col_ticket, col_profit]
+    if col_date is not None and col_date in df.columns:
+        subset.append(col_date)
+    dup_mask = df.duplicated(subset=subset, keep='first')
+    removed = int(dup_mask.sum())
+    if removed:
+        return df.loc[~dup_mask].copy(), removed
+    return df, 0
+
+
 def extraire_nombre(valeur):
+    """Parse un nombre exporté avec conventions FR/EU/US.
+
+    Exemples : ``1 234,56`` -> 1234.56, ``1,234.56`` -> 1234.56,
+    ``1.234,56`` -> 1234.56. Les symboles monétaires/% sont ignorés.
+    """
     if pd.isna(valeur):
         return np.nan
-    s = str(valeur).replace('\xa0', '').replace(' ', '').replace(',', '')
-    match = re.search(r'-?\d+\.?\d*', s)
-    return float(match.group()) if match else np.nan
+    s = str(valeur).strip().replace('\xa0', '').replace(' ', '').replace("'", '')
+    # Garder signe, chiffres et séparateurs décimaux/milliers.
+    match = re.search(r'[-+]?\d[\d.,]*', s)
+    if not match:
+        return np.nan
+    token = match.group(0)
+    if ',' in token and '.' in token:
+        # Le dernier séparateur est normalement le séparateur décimal.
+        decimal_sep = ',' if token.rfind(',') > token.rfind('.') else '.'
+        thousands_sep = '.' if decimal_sep == ',' else ','
+        token = token.replace(thousands_sep, '').replace(decimal_sep, '.')
+    elif ',' in token:
+        # Virgule seule : décimale si 1-2 chiffres suivent, sinon milliers.
+        parts = token.split(',')
+        if len(parts) == 2 and (len(parts[1]) <= 2 or (len(parts[1]) == 3 and len(parts[0].lstrip('+-')) > 3)):
+            token = parts[0] + '.' + parts[1]
+        else:
+            token = ''.join(parts)
+    elif '.' in token:
+        parts = token.split('.')
+        if len(parts) > 2:
+            token = ''.join(parts[:-1]) + '.' + parts[-1]
+    try:
+        return float(token)
+    except ValueError:
+        return np.nan
 
 
 # ============================================================
@@ -2097,12 +2292,11 @@ def lire_trades_mt4(contents, filename):
     if df is None:
         return None, None, "Tableau des transactions introuvable dans le rapport MT4. Vérifiez qu'il s'agit du rapport complet (\"Save as Report\"), pas d'un résumé."
 
-    col_profit, col_type, col_date, col_ticket, col_volume = None, None, None, None, None
+    col_profit = _choisir_colonne_profit(df.columns, prefer_net=True, allow_gross=True)
+    col_type, col_date, col_ticket, col_volume = None, None, None, None
     col_sl, col_tp, col_open_price = None, None, None
     col_symbole = None
     for col in df.columns:
-        if 'profit' in col and col_profit is None:
-            col_profit = col
         if 'type' in col and col_type is None:
             col_type = col
         if any(k in col for k in ['ticket', 'order', '#']) and col_ticket is None:
@@ -2152,11 +2346,12 @@ def lire_trades_mt4(contents, filename):
                 break
 
     if not col_profit:
-        return None, None, "Colonne 'Profit' introuvable dans le rapport MT4."
+        return None, None, "Colonne de P&L introuvable dans le rapport MT4. Recherchez une colonne 'Net', 'Profit' ou 'P&L'."
 
     df_clean = df.copy()
     df_clean[col_profit] = df_clean[col_profit].apply(extraire_nombre)
     df_clean = df_clean.dropna(subset=[col_profit])
+    df_clean, _doublons_exacts = _dedoublonner_trades_exacts(df_clean, col_profit, col_ticket, col_date)
 
     if len(df_clean) < MIN_TRADES_ABSOLUTE:
         return None, None, f"Pas assez de trades valides trouvés (minimum {MIN_TRADES_ABSOLUTE} requis)."
@@ -2181,8 +2376,13 @@ def lire_trades_mt4(contents, filename):
             "symbole": str(row[col_symbole]).strip() if col_symbole and pd.notna(row[col_symbole]) else None,
         })
 
-    return trades_filtres, trades_detail, None
+        pnl_semantique = _classifier_semantique_pnl(col_profit if 'col_profit' in locals() else 'profit_abs', "mt4")
+    for _d in trades_detail:
+        _d["pnl_source"] = pnl_semantique["source"]
+        _d["pnl_nature"] = pnl_semantique["nature"]
+        _d["pnl_couts_deja_inclus"] = pnl_semantique["couts_deja_inclus"]
 
+    return trades_filtres, trades_detail, None
 
 
 # ============================================================
@@ -2215,14 +2415,7 @@ def lire_trades_ctrader(contents, filename):
 
     df.columns = [str(c).strip().lower() for c in df.columns]
 
-    col_profit = None
-    for keyword in ['net profit', 'net pnl', 'net', 'pnl', 'profit', 'gross']:
-        for col in df.columns:
-            if keyword in col:
-                col_profit = col
-                break
-        if col_profit:
-            break
+    col_profit = _choisir_colonne_profit(df.columns, prefer_net=True, allow_gross=True)
 
     if not col_profit:
         return None, None, "Colonne de profit introuvable dans l'export cTrader. Assurez-vous d'inclure une colonne 'Net' ou 'Profit' lors de l'export."
@@ -2256,6 +2449,7 @@ def lire_trades_ctrader(contents, filename):
     df_clean = df.copy()
     df_clean[col_profit] = df_clean[col_profit].apply(extraire_nombre)
     df_clean = df_clean.dropna(subset=[col_profit])
+    df_clean, _doublons_exacts = _dedoublonner_trades_exacts(df_clean, col_profit, col_ticket, col_date)
 
     if len(df_clean) < MIN_TRADES_ABSOLUTE:
         return None, None, f"Pas assez de trades valides trouvés (minimum {MIN_TRADES_ABSOLUTE} requis)."
@@ -2273,6 +2467,12 @@ def lire_trades_ctrader(contents, filename):
             "volume": round(float(volume), 4) if not pd.isna(volume) else None,
             "symbole": str(row[col_symbole]).strip() if col_symbole and pd.notna(row[col_symbole]) else None,
         })
+
+        pnl_semantique = _classifier_semantique_pnl(col_profit if 'col_profit' in locals() else 'profit_abs', "ctrader")
+    for _d in trades_detail:
+        _d["pnl_source"] = pnl_semantique["source"]
+        _d["pnl_nature"] = pnl_semantique["nature"]
+        _d["pnl_couts_deja_inclus"] = pnl_semantique["couts_deja_inclus"]
 
     return trades_filtres, trades_detail, None
 
@@ -2305,16 +2505,10 @@ def lire_trades_tradingview(contents, filename):
 
     df.columns = [str(c).strip().lower() for c in df.columns]
 
-    col_profit = None
-    for col in df.columns:
-        if col == 'profit' or (col.startswith('profit') and '%' not in col):
-            col_profit = col
-            break
-    if not col_profit:
-        for col in df.columns:
-            if 'profit' in col and '%' not in col and 'cumulative' not in col:
-                col_profit = col
-                break
+    # Même garde-fou que les autres parsers : ne jamais prendre une
+    # métrique de résumé (Profit Factor, Cumulative Profit, etc.) pour
+    # le P&L individuel d'un trade.
+    col_profit = _choisir_colonne_profit(df.columns, prefer_net=True, allow_gross=True)
 
     col_type = None
     for col in df.columns:
@@ -2331,12 +2525,10 @@ def lire_trades_tradingview(contents, filename):
     if len(df_exits) == 0:
         return None, None, "Aucune ligne \"Exit\" trouvée — ce fichier ne semble pas être un export \"List of Trades\" standard de TradingView."
 
-    df_exits[col_profit] = df_exits[col_profit].apply(extraire_nombre)
-    df_exits = df_exits.dropna(subset=[col_profit])
-
-    if len(df_exits) < MIN_TRADES_ABSOLUTE:
-        return None, None, f"Pas assez de trades valides trouvés (minimum {MIN_TRADES_ABSOLUTE} requis)."
-
+    # Les métadonnées d'identification doivent être déterminées AVANT le
+    # dédoublonnage : un export TradingView peut contenir deux lignes Exit
+    # identiques en apparence, mais appartenant à des trades distincts si
+    # aucun identifiant n'est disponible. Dans ce cas, on ne dédoublonne pas.
     col_date = None
     for col in df.columns:
         if 'date' in col or 'time' in col:
@@ -2347,6 +2539,13 @@ def lire_trades_tradingview(contents, filename):
         if 'trade #' in col or col == 'trade' or '#' in col:
             col_ticket = col
             break
+
+    df_exits[col_profit] = df_exits[col_profit].apply(extraire_nombre)
+    df_exits = df_exits.dropna(subset=[col_profit])
+    df_exits, _doublons_exacts = _dedoublonner_trades_exacts(df_exits, col_profit, col_ticket, col_date)
+
+    if len(df_exits) < MIN_TRADES_ABSOLUTE:
+        return None, None, f"Pas assez de trades valides trouvés (minimum {MIN_TRADES_ABSOLUTE} requis)."
     col_volume = None
     for col in df.columns:
         if any(k in col for k in ['contracts', 'quantity', 'position size', 'shares']):
@@ -2365,6 +2564,12 @@ def lire_trades_tradingview(contents, filename):
             "profit": round(float(row[col_profit]), 2),
             "volume": round(float(volume), 4) if not pd.isna(volume) else None,
         })
+
+        pnl_semantique = _classifier_semantique_pnl(col_profit if 'col_profit' in locals() else 'profit_abs', "tradingview")
+    for _d in trades_detail:
+        _d["pnl_source"] = pnl_semantique["source"]
+        _d["pnl_nature"] = pnl_semantique["nature"]
+        _d["pnl_couts_deja_inclus"] = pnl_semantique["couts_deja_inclus"]
 
     return trades_filtres, trades_detail, None
 
@@ -2399,14 +2604,7 @@ def lire_trades_ninjatrader(contents, filename):
 
     df.columns = [str(c).strip().lower() for c in df.columns]
 
-    col_profit = None
-    for keyword in ['profit', 'pnl', 'p/l']:
-        for col in df.columns:
-            if keyword in col:
-                col_profit = col
-                break
-        if col_profit:
-            break
+    col_profit = _choisir_colonne_profit(df.columns, prefer_net=True, allow_gross=True)
     if not col_profit:
         return None, None, "Colonne de profit introuvable dans l'export NinjaTrader. Assurez-vous d'inclure une colonne 'Profit' lors de l'export."
 
@@ -2429,6 +2627,7 @@ def lire_trades_ninjatrader(contents, filename):
     df_clean = df.copy()
     df_clean[col_profit] = df_clean[col_profit].apply(extraire_nombre)
     df_clean = df_clean.dropna(subset=[col_profit])
+    df_clean, _doublons_exacts = _dedoublonner_trades_exacts(df_clean, col_profit, col_ticket, col_date)
 
     if len(df_clean) < MIN_TRADES_ABSOLUTE:
         return None, None, f"Pas assez de trades valides trouvés (minimum {MIN_TRADES_ABSOLUTE} requis)."
@@ -2446,6 +2645,12 @@ def lire_trades_ninjatrader(contents, filename):
             "volume": round(float(volume), 4) if not pd.isna(volume) else None,
             "symbole": str(row[col_symbole]).strip() if col_symbole and pd.notna(row[col_symbole]) else None,
         })
+
+        pnl_semantique = _classifier_semantique_pnl(col_profit if 'col_profit' in locals() else 'profit_abs', "ninjatrader")
+    for _d in trades_detail:
+        _d["pnl_source"] = pnl_semantique["source"]
+        _d["pnl_nature"] = pnl_semantique["nature"]
+        _d["pnl_couts_deja_inclus"] = pnl_semantique["couts_deja_inclus"]
 
     return trades_filtres, trades_detail, None
 
@@ -2511,6 +2716,12 @@ def lire_trades_freqtrade(contents, filename):
     if len(profits) < MIN_TRADES_ABSOLUTE:
         return None, None, f"Pas assez de trades valides trouvés (minimum {MIN_TRADES_ABSOLUTE} requis)."
 
+    pnl_semantique = _classifier_semantique_pnl("profit_abs", "freqtrade")
+    for _d in trades_detail:
+        _d["pnl_source"] = pnl_semantique["source"]
+        _d["pnl_nature"] = pnl_semantique["nature"]
+        _d["pnl_couts_deja_inclus"] = pnl_semantique["couts_deja_inclus"]
+
     return np.array(profits), trades_detail, None
 
 
@@ -2523,6 +2734,37 @@ def lire_trades_freqtrade(contents, filename):
 # logique que les parseurs dédiés, juste sans les repères spécifiques
 # à une plateforme précise.
 # ============================================================
+
+def _filtrer_lignes_probablement_trades(df, col_profit, col_date=None, col_ticket=None, col_type=None, col_symbole=None):
+    """Écarte les lignes de résumé manifestes dans un tableau générique.
+
+    Une ligne avec un P&L numérique n'est pas automatiquement un trade : certains
+    exports mélangent historique et statistiques de synthèse. On ne filtre que si
+    un marqueur structurel de trade est disponible ; sinon on conserve les lignes
+    et on laisse l'analyse d'intégrité signaler l'incertitude.
+    """
+    if not any(c is not None for c in (col_date, col_ticket, col_type, col_symbole)):
+        return df, 0
+    masks = []
+    if col_date is not None:
+        dates, _ = _parse_dates_robuste(df[col_date].tolist(), dayfirst_default=None)
+        masks.append(dates.notna().to_numpy())
+    if col_ticket is not None:
+        txt = df[col_ticket].fillna("").astype(str).str.strip()
+        masks.append(txt.ne("").to_numpy())
+    if col_type is not None:
+        txt = df[col_type].fillna("").astype(str).str.strip().str.lower()
+        trade_words = r"(buy|sell|long|short|entry|exit|achat|vente|position|trade)"
+        masks.append(txt.str.contains(trade_words, regex=True, na=False).to_numpy())
+    if col_symbole is not None:
+        txt = df[col_symbole].fillna("").astype(str).str.strip()
+        masks.append(txt.ne("").to_numpy())
+    # Une seule preuve forte suffit ; l'intersection serait trop agressive sur
+    # les exports qui n'ont pas tous les champs renseignés.
+    mask = np.logical_or.reduce(masks) if masks else np.ones(len(df), dtype=bool)
+    removed = int((~mask).sum())
+    return df.loc[mask].copy(), removed
+
 
 def lire_trades_generique(contents, filename):
     filename_lower = filename.lower()
@@ -2543,14 +2785,12 @@ def lire_trades_generique(contents, filename):
 
     df.columns = [str(c).strip().lower() for c in df.columns]
 
-    col_profit = None
-    for keyword in ['profit', 'pnl', 'p/l', 'net', 'gain']:
+    col_profit = _choisir_colonne_profit(df.columns, prefer_net=True, allow_gross=False)
+    if col_profit is None:
         for col in df.columns:
-            if keyword in col:
+            if 'gain' in col and not any(x in col for x in ['%', 'percent', 'pourcent']):
                 col_profit = col
                 break
-        if col_profit:
-            break
     if not col_profit:
         return None, None, "Colonne de profit introuvable. Le fichier doit contenir une colonne dont le nom inclut 'profit', 'pnl' ou 'net'."
 
@@ -2573,6 +2813,9 @@ def lire_trades_generique(contents, filename):
     df_clean = df.copy()
     df_clean[col_profit] = df_clean[col_profit].apply(extraire_nombre)
     df_clean = df_clean.dropna(subset=[col_profit])
+    df_clean, _lignes_resume_exclues = _filtrer_lignes_probablement_trades(
+        df_clean, col_profit, col_date, None, col_type, col_symbole
+    )
 
     if len(df_clean) < MIN_TRADES_ABSOLUTE:
         return None, None, f"Pas assez de trades valides trouvés (minimum {MIN_TRADES_ABSOLUTE} requis). Vérifiez que chaque ligne représente bien un trade clôturé."
@@ -2591,11 +2834,13 @@ def lire_trades_generique(contents, filename):
             "symbole": str(row[col_symbole]).strip() if col_symbole and pd.notna(row[col_symbole]) else None,
         })
 
+        pnl_semantique = _classifier_semantique_pnl(col_profit if 'col_profit' in locals() else 'profit_abs', "autre")
+    for _d in trades_detail:
+        _d["pnl_source"] = pnl_semantique["source"]
+        _d["pnl_nature"] = pnl_semantique["nature"]
+        _d["pnl_couts_deja_inclus"] = pnl_semantique["couts_deja_inclus"]
+
     return trades_filtres, trades_detail, None
-
-
-# Registre des parsers par plateforme. Toute plateforme non reconnue
-# retombe sur MT5.
 PARSERS_PLATEFORME = {
     "mt5": lire_trades_mt5,
     "mt4": lire_trades_mt4,
