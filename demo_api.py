@@ -100,6 +100,11 @@ async def demo_analyser(
     protocole: str = Form("personnalise"),
     n_windows: int = Form(N_WINDOWS_DEFAULT),
     is_ratio: float = Form(IS_RATIO_DEFAULT),
+    n_trials_testes: int = Form(None),
+    max_equity_drawdown_pct: float = Form(None),
+    n_parametres_libres: int = Form(None),
+    rendement_benchmark_pct: float = Form(None),
+    couts_reels_payes: float = Form(None),
 ):
     ip = request.client.host if request.client else "inconnue"
     if not _ip_autorisee(ip):
@@ -113,12 +118,10 @@ async def demo_analyser(
 
     contents = await trades_file.read()
 
-    # n_trials_testes n'est pas exposé dans la démo -- c'est un champ
-    # déclaratif avancé (biais de sélection multiple), pas essentiel pour
-    # un premier essai rapide sans inscription.
     resultat = construire_resultat_analyse(
         contents, trades_file.filename, bot_name, plateforme, capital_initial,
-        protocole, n_windows, is_ratio, n_trials_testes=None,
+        protocole, n_windows, is_ratio, n_trials_testes,
+        max_equity_drawdown_pct, n_parametres_libres, rendement_benchmark_pct, couts_reels_payes,
     )
 
     # Ni id, ni strategie_id : rien n'est persisté, donc rien à identifier
