@@ -196,6 +196,8 @@ def init_db():
             oos_profit_factor REAL,
             n_trades_oos INTEGER,
             echantillon_fiable INTEGER,
+            fiabilite_evaluation TEXT,
+            raisons_fiabilite TEXT,
             resultat_json TEXT NOT NULL
         )
     """)
@@ -373,6 +375,16 @@ def init_db():
     except sqlite3.OperationalError:
         pass
 
+    # Fiabilité de l'évaluation : stockée séparément du score.
+    try:
+        conn.execute("ALTER TABLE analyses ADD COLUMN fiabilite_evaluation TEXT")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        conn.execute("ALTER TABLE analyses ADD COLUMN raisons_fiabilite TEXT")
+    except sqlite3.OperationalError:
+        pass
+
     # Migration des analyses déjà enregistrées avant ce changement : une
     # stratégie créée par nom distinct (bot_name), analyses rattachées
     # rétroactivement. Idempotent — ne retouche que ce qui n'est pas
@@ -473,6 +485,14 @@ def qualite_absolue_multiplicateur(oos_pf):
     est bonne — ce qui n'a pas de sens pour un utilisateur qui doit décider
     de passer en compte réel. Paliers progressifs plutôt qu'un couperet net.
     """
+    # PF_SENTINELLE_AUCUNE_PERTE représente le cas particulier « aucun trade
+    # perdant ». Il ne doit surtout pas être traité comme un PF réel de 0.1 :
+    # sinon une stratégie sans perte voit artificiellement son pilier de
+    # stabilité multiplié par 0, alors que le cas doit simplement être
+    # évalué par les autres épreuves (concentration, coûts, trajectoire, etc.).
+    if oos_pf == PF_SENTINELLE_AUCUNE_PERTE:
+        return 1.0
+
     for seuil, mult in PALIERS_QUALITE_ABSOLUE:
         if oos_pf >= seuil:
             return mult
@@ -713,6 +733,18 @@ def stress_test_fragilite(trades_array, rng, n_iterations=N_SIMULATIONS_STRESS, 
 # ============================================================
 
 def stress_test_costs(trades_array, capital_ref, volumes=None, cost_pct_per_trade=COST_PCT_PER_TRADE):
+    """Teste la marge face à plusieurs niveaux de coûts supplémentaires.
+
+    Le coût de référence reste une CONVENTION de stress, pas une estimation
+    des frais réels du broker. Si le P&L exporté est déjà net de commission,
+    ce test ajoute volontairement un coût supplémentaire : il mesure donc une
+    marge de sécurité vis-à-vis de conditions plus défavorables, et non les
+    frais réellement payés.
+
+    Les scénarios sont exprimés comme multiples du coût conventionnel :
+    0.5x, 1x, 1.5x et 2x. Le résultat historique `stressed_profit` reste
+    calculé au scénario 1x pour compatibilité avec l'UI existante.
+    """
     if len(trades_array) == 0 or not capital_ref or capital_ref <= 0:
         return {
             "stressed_profit": 0.0,
@@ -720,37 +752,65 @@ def stress_test_costs(trades_array, capital_ref, volumes=None, cost_pct_per_trad
             "cost_per_trade_dollars": 0.0,
             "profitable_under_cost_stress": False,
             "cost_ajuste_par_volume": False,
+            "cost_base_pct_per_trade": cost_pct_per_trade * 100,
+            "cost_break_even_pct_per_trade": None,
+            "cost_scenarios": [],
         }
 
     cost_base = capital_ref * cost_pct_per_trade
     cost_ajuste_par_volume = False
-    couts_par_trade = None
+    couts_par_trade_base = None
 
     if volumes is not None and len(volumes) == len(trades_array):
         volumes_valides = [v for v in volumes if v is not None and v > 0]
-        # Ajustement fiable seulement si au moins la moitié des trades ont un volume connu.
+        # Ajustement seulement si au moins la moitié des trades ont un volume connu.
         if len(volumes_valides) >= len(trades_array) * 0.5:
             volume_moyen = float(np.mean(volumes_valides))
             if volume_moyen > 0:
-                couts_par_trade = np.array([
+                couts_par_trade_base = np.array([
                     cost_base * (v / volume_moyen) if (v is not None and v > 0) else cost_base
                     for v in volumes
                 ])
                 cost_ajuste_par_volume = True
 
-    if couts_par_trade is None:
-        couts_par_trade = np.full(len(trades_array), cost_base)
+    if couts_par_trade_base is None:
+        couts_par_trade_base = np.full(len(trades_array), cost_base)
 
-    total_penalty = float(np.sum(couts_par_trade))
-    stressed_profit = float(np.sum(trades_array - couts_par_trade))
-    cost_per_trade_moyen = round(total_penalty / len(trades_array), 2) if len(trades_array) > 0 else 0.0
+    total_penalty_base = float(np.sum(couts_par_trade_base))
+    stressed_profit_base = float(np.sum(trades_array - couts_par_trade_base))
+    cost_per_trade_moyen = round(total_penalty_base / len(trades_array), 2)
+
+    # Coût moyen supplémentaire maximal avant que le profit OOS ne tombe à 0.
+    profit_brut = float(np.sum(trades_array))
+    break_even_cost_total = profit_brut if profit_brut > 0 else 0.0
+    break_even_cost_pct_per_trade = (
+        break_even_cost_total / (len(trades_array) * capital_ref)
+        if break_even_cost_total > 0 else 0.0
+    )
+
+    multiplicateurs = [0.5, 1.0, 1.5, 2.0]
+    scenarios = []
+    for mult in multiplicateurs:
+        couts = couts_par_trade_base * mult
+        penalty = float(np.sum(couts))
+        profit = float(np.sum(trades_array - couts))
+        scenarios.append({
+            "multiplicateur": mult,
+            "cout_total": round(penalty, 2),
+            "cout_moyen_par_trade": round(penalty / len(trades_array), 2),
+            "profit_net_apres_couts": round(profit, 2),
+            "rentable": bool(profit > 0),
+        })
 
     return {
-        "stressed_profit": round(stressed_profit, 2),
-        "cost_penalty_total": round(total_penalty, 2),
+        "stressed_profit": round(stressed_profit_base, 2),
+        "cost_penalty_total": round(total_penalty_base, 2),
         "cost_per_trade_dollars": cost_per_trade_moyen,
-        "profitable_under_cost_stress": bool(stressed_profit > 0),
+        "profitable_under_cost_stress": bool(stressed_profit_base > 0),
         "cost_ajuste_par_volume": cost_ajuste_par_volume,
+        "cost_base_pct_per_trade": round(cost_pct_per_trade * 100, 4),
+        "cost_break_even_pct_per_trade": round(break_even_cost_pct_per_trade * 100, 4),
+        "cost_scenarios": scenarios,
     }
 
 
@@ -758,26 +818,101 @@ def stress_test_costs(trades_array, capital_ref, volumes=None, cost_pct_per_trad
 # STRESS PRO — CHANTIER 3 : Découpe temporelle (Rolling)
 # ============================================================
 
-def stress_test_rolling(trades_array, n_windows=N_ROLLING_WINDOWS):
-    if len(trades_array) < n_windows:
+def _fenetres_rolling_avec_chevauchement(trades, n_windows):
+    """Construit de vraies fenêtres rolling sur UNE séquence chronologique.
+
+    Les fenêtres se chevauchent : contrairement à np.array_split, un trade peut
+    donc appartenir à plusieurs fenêtres. La taille de fenêtre est choisie
+    pour obtenir environ `n_windows` observations et le pas est inférieur à la
+    taille de fenêtre. Aucun raccordement n'est fait entre deux segments OOS.
+    """
+    trades = np.asarray(trades, dtype=float)
+    n = len(trades)
+    if n == 0 or n_windows < 1:
+        return []
+    if n < n_windows:
+        return []
+
+    # Une vraie fenêtre rolling doit avoir une taille supérieure au pas :
+    # deux fenêtres successives doivent donc partager au moins une partie
+    # de leurs observations. On vise ici ~50% de chevauchement, puis on
+    # répartit les points de départ sur toute la séquence.
+    if n_windows == 1:
+        return [trades]
+
+    window_size = max(2, int(math.ceil((2 * n) / n_windows)))
+    if window_size >= n:
+        return []
+
+    max_start = n - window_size
+    if max_start < n_windows - 1:
+        # Impossible de construire n_windows fenêtres distinctes avec un
+        # chevauchement réel sur cet échantillon. Mieux vaut signaler une
+        # insuffisance que retourner des fenêtres dupliquées.
+        return []
+
+    starts = np.rint(np.linspace(0, max_start, n_windows)).astype(int).tolist()
+    starts = list(dict.fromkeys(starts))
+    if len(starts) != n_windows:
+        return []
+
+    windows = [trades[start:start + window_size] for start in starts]
+    # Garde-fou explicite : chaque paire consécutive doit partager au moins
+    # une observation.
+    for a, b in zip(windows, windows[1:]):
+        if not np.intersect1d(a, b).size:
+            return []
+    return windows
+
+
+def stress_test_rolling(trades_array, n_windows=N_ROLLING_WINDOWS, segments=None):
+    """Stabilité temporelle par vraies fenêtres rolling, sans franchir les gaps OOS.
+
+    Avec `segments`, chaque fenêtre OOS est traitée indépendamment. Cela évite
+    de créer une fausse continuité entre deux périodes de test séparées par
+    une période IS. Sans `segments`, le comportement reste celui d'une seule
+    séquence chronologique.
+    """
+    if segments is None:
+        segments = [np.asarray(trades_array, dtype=float)]
+    else:
+        segments = [np.asarray(seg, dtype=float) for seg in segments if len(seg) > 0]
+
+    rolling_windows = []
+    for segment_index, segment in enumerate(segments):
+        for window_index, window in enumerate(_fenetres_rolling_avec_chevauchement(segment, n_windows)):
+            rolling_windows.append({
+                "segment": segment_index,
+                "window": window_index,
+                "trades": window,
+                "profit": float(np.sum(window)),
+            })
+
+    if not rolling_windows:
         return {
             "rolling_profitable_pct": 0.0,
             "rolling_min_window_profit": 0.0,
             "rolling_max_window_profit": 0.0,
-            "rolling_stable": False
+            "rolling_stable": False,
+            "rolling_windows_testes": 0,
+            "rolling_segments_testes": len(segments),
+            "rolling_chevauchement": True,
+            "rolling_insuffisant": True,
         }
 
-    chunks = np.array_split(trades_array, n_windows)
-    window_profits = [float(np.sum(chunk)) for chunk in chunks]
-
-    profitable_chunks = sum(1 for p in window_profits if p > 0)
-    profitable_pct = (profitable_chunks / n_windows) * 100.0
+    window_profits = [w["profit"] for w in rolling_windows]
+    profitable_windows = sum(1 for p in window_profits if p > 0)
+    profitable_pct = (profitable_windows / len(window_profits)) * 100.0
 
     return {
         "rolling_profitable_pct": round(profitable_pct, 1),
         "rolling_min_window_profit": round(min(window_profits), 2),
         "rolling_max_window_profit": round(max(window_profits), 2),
-        "rolling_stable": bool(profitable_pct >= 60.0)
+        "rolling_stable": bool(profitable_pct >= 60.0),
+        "rolling_windows_testes": len(rolling_windows),
+        "rolling_segments_testes": len(segments),
+        "rolling_chevauchement": True,
+        "rolling_insuffisant": False,
     }
 
 
@@ -807,7 +942,10 @@ def extraire_periode(details_list):
     if not dates_brutes:
         return None
     try:
-        dates_parsees = pd.to_datetime(pd.Series(dates_brutes), errors='coerce')
+        # Ne jamais appliquer une heuristique day-first aux formats MT5
+        # non ambigus YYYY.MM.DD : une liste comme 2023.06.07 /
+        # 2023.07.01 serait sinon interprétée avec mois/jour inversés.
+        dates_parsees, _ = _parse_dates_robuste(dates_brutes, dayfirst_default=True)
     except Exception:
         return None
     dates_valides = dates_parsees.dropna()
@@ -825,7 +963,10 @@ def estimer_couverture_temporelle(details_list):
         return None
 
     try:
-        dates_parsees = pd.to_datetime(pd.Series(dates_brutes), errors='coerce')
+        # Ne jamais appliquer une heuristique day-first aux formats MT5
+        # non ambigus YYYY.MM.DD : une liste comme 2023.06.07 /
+        # 2023.07.01 serait sinon interprétée avec mois/jour inversés.
+        dates_parsees, _ = _parse_dates_robuste(dates_brutes, dayfirst_default=True)
     except Exception:
         return None
     dates_valides = dates_parsees.dropna()
@@ -1638,6 +1779,125 @@ def calculer_statistiques_detaillees(trades, capital_initial=None):
 
 
 # ============================================================
+# NORMALISATION / INTÉGRITÉ DES TRADES IMPORTÉS
+# ============================================================
+
+def _parse_dates_robuste(values, dayfirst_default=None):
+    """Parse les dates sans imposer silencieusement une locale unique.
+
+    Les dates ISO (YYYY-MM-DD...) sont non ambiguës. Les formats à slash
+    dont les deux premiers champs sont <= 12 restent potentiellement
+    ambigus (MM/DD vs DD/MM) : on les signale au lieu de réordonner les
+    trades sur une interprétation incertaine.
+    """
+    serie = pd.Series(list(values), dtype="object")
+    textes = serie.fillna("").astype(str).str.strip()
+    ambigus = []
+    for i, txt in textes.items():
+        m = re.match(r"^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})(?:\s|$)", txt)
+        if m and int(m.group(1)) <= 12 and int(m.group(2)) <= 12:
+            # ISO yyyy-mm-dd ne passe pas ici ; seuls les formats courts
+            # à deux champs numériques sont considérés ambigus.
+            ambigus.append(i)
+
+    parsed = pd.Series(pd.NaT, index=serie.index, dtype="datetime64[ns]")
+    for i, txt in textes.items():
+        if not txt:
+            continue
+        try:
+            # MT5 peut fournir nativement YYYY.MM.DD[ HH:MM[:SS]].
+            # Ce format est intrinsèquement non ambigu : parser explicitement
+            # l'année/mois/jour avant toute heuristique de locale.
+            if re.match(r"^\d{4}\.\d{2}\.\d{2}(?:\s|$)", txt):
+                dt = pd.to_datetime(txt, format="%Y.%m.%d %H:%M:%S", errors="coerce")
+                if pd.isna(dt):
+                    dt = pd.to_datetime(txt, format="%Y.%m.%d %H:%M", errors="coerce")
+                if pd.isna(dt):
+                    dt = pd.to_datetime(txt, format="%Y.%m.%d", errors="coerce")
+            elif re.match(r"^\d{4}-\d{2}-\d{2}", txt):
+                dt = pd.to_datetime(txt, errors="coerce", dayfirst=False)
+            elif i in ambigus and dayfirst_default is not None:
+                dt = pd.to_datetime(txt, errors="coerce", dayfirst=dayfirst_default)
+            elif i in ambigus:
+                # Locale inconnue : on parse pour pouvoir informer, mais
+                # l'ordre ne sera pas modifié sur une date ambiguë.
+                dt = pd.to_datetime(txt, errors="coerce", dayfirst=True)
+            else:
+                dt = pd.to_datetime(txt, errors="coerce", dayfirst=True)
+
+            # Les exports peuvent mélanger dates naïves et timestamps avec
+            # offset (ex. +01:00 / Z). Le modèle interne utilise des dates
+            # naïves pour le tri ; quand un offset est fourni, on convertit
+            # d'abord en UTC afin de ne pas comparer deux heures locales
+            # comme si elles appartenaient au même fuseau.
+            if pd.isna(dt):
+                parsed.loc[i] = pd.NaT
+            elif getattr(dt, "tzinfo", None) is not None:
+                parsed.loc[i] = dt.tz_convert("UTC").tz_localize(None)
+            else:
+                parsed.loc[i] = dt
+        except Exception:
+            parsed.loc[i] = pd.NaT
+    return parsed, len(ambigus)
+
+
+def normaliser_integrite_import(trades_array, details_list, dayfirst_default=None):
+    """Valide l'alignement et impose un ordre chronologique sûr si possible.
+
+    Retourne (trades_array, details_list, warnings). Aucun trade n'est
+    supprimé à cause d'un P&L nul : 0 est un résultat valide. Les lignes
+    sans date ne sont pas supprimées, mais rendent les métriques dépendantes
+    de l'ordre fourni par l'export et sont signalées.
+    """
+    warnings = []
+    arr = np.asarray(trades_array, dtype=float)
+    details = list(details_list or [])
+
+    if len(arr) != len(details):
+        raise ValueError("Le nombre de trades et le nombre de lignes détaillées ne correspondent pas.")
+    if len(arr) == 0:
+        return arr, details, warnings
+    if not np.isfinite(arr).all():
+        raise ValueError("Le fichier contient des P&L non numériques après parsing.")
+
+    dates = [d.get("date") if isinstance(d, dict) else None for d in details]
+    parsed, n_ambigus = _parse_dates_robuste(dates, dayfirst_default=dayfirst_default)
+    n_valides = int(parsed.notna().sum())
+
+    if n_valides == 0:
+        warnings.append({
+            "level": "warning", "code": "dates_absentes",
+            "message": "Aucune date de trade exploitable n'a été trouvée. Les métriques dépendantes de l'ordre des trades (drawdown, Monte Carlo de trajectoire, fenêtres temporelles) utilisent donc l'ordre fourni par l'export."
+        })
+        return arr, details, warnings
+
+    if n_valides < len(arr):
+        warnings.append({
+            "level": "warning", "code": "dates_partielles",
+            "message": f"{len(arr) - n_valides} trade(s) n'ont pas de date exploitable. L'ordre de ces lignes ne peut pas être vérifié automatiquement."
+        })
+        return arr, details, warnings
+
+    if n_ambigus and dayfirst_default is None:
+        warnings.append({
+            "level": "warning", "code": "dates_ambiguës",
+            "message": "Certaines dates utilisent un format à slash potentiellement ambigu (MM/JJ vs JJ/MM). Xtrunn n'a pas réordonné ces trades automatiquement car la locale de l'export n'est pas connue."
+        })
+        return arr, details, warnings
+
+    ordre = np.argsort(parsed.to_numpy(dtype="datetime64[ns]"), kind="stable")
+    if not np.array_equal(ordre, np.arange(len(arr))):
+        arr = arr[ordre]
+        details = [details[int(i)] for i in ordre]
+        warnings.append({
+            "level": "warning", "code": "ordre_chronologique_corrige",
+            "message": "Les trades n'étaient pas dans l'ordre chronologique. Xtrunn les a réordonnés selon leur date avant de calculer les métriques dépendantes de la trajectoire."
+        })
+
+    return arr, details, warnings
+
+
+# ============================================================
 # PARSING MT5
 # ============================================================
 
@@ -2412,6 +2672,22 @@ def construire_resultat_analyse(
     if err:
         return {"erreur": err}
 
+    try:
+        # Politique de date connue par plateforme. Les exports francophones
+        # MT4/MT5/cTrader utilisent usuellement JJ/MM ; TradingView,
+        # NinjaTrader et Freqtrade sont traités sans hypothèse de locale
+        # lorsqu'ils fournissent de l'ISO ou des dates non ambiguës. Le
+        # format générique reste volontairement conservateur.
+        date_policy = {
+            "mt4": True, "mt5": True, "ctrader": True,
+            "tradingview": None, "ninjatrader": None, "freqtrade": None, "autre": None
+        }
+        trades_array, details_list, import_warnings = normaliser_integrite_import(
+            trades_array, details_list, dayfirst_default=date_policy.get(str(plateforme or "").strip().lower())
+        )
+    except ValueError as exc:
+        return {"erreur": str(exc)}
+
     # Le seuil minimum par fenêtre s'ajuste au ratio Référence/Test choisi :
     # à ratio élevé (ex: 90% Référence), une fenêtre de 12 trades ne
     # laisserait qu'1 seul trade de Test — la validation passerait, mais le
@@ -2544,7 +2820,7 @@ def construire_resultat_analyse(
     score_mc = mc_res["score"]
     fragilite_res = stress_test_fragilite(oos_trades, rng, N_SIMULATIONS_STRESS, STRESS_DROP_RATIO)
     costs_res = stress_test_costs(oos_trades, oos_capital_ref, oos_volumes)
-    rolling_res = stress_test_rolling(oos_trades, N_ROLLING_WINDOWS)
+    rolling_res = stress_test_rolling(oos_trades, N_ROLLING_WINDOWS, segments=[f["oos_trades"] for f in fenetres])
 
     def pct(valeur):
         return round(valeur / oos_capital_ref * 100, 2)
@@ -2603,7 +2879,8 @@ def construire_resultat_analyse(
 
     # Rassemblement des alertes de santé
     toutes_les_alertes = (
-        [dict(w, pilier="isoos") for w in pilier2_res["warnings"]]
+        [dict(w, pilier="diagnostics") for w in import_warnings]
+        + [dict(w, pilier="isoos") for w in pilier2_res["warnings"]]
         + [dict(w, pilier="pilier3") for w in pilier3_res["warnings"]]
         + [dict(w, pilier="pilier4") for w in pilier4_res["warnings"]]
         + [dict(w, pilier="diagnostics") for w in risque_ruine_res["alertes"]]
@@ -3104,9 +3381,9 @@ def _enregistrer_analyse_en_base(bot_name, resultat, strategie_id_force=None, co
         """
         INSERT INTO analyses
             (bot_name, strategie_id, created_at, score_global, score_median, score_p10, score_p90,
-             oos_profit_net, oos_profit_factor, n_trades_oos, echantillon_fiable, resultat_json, nom_fichier,
+             oos_profit_net, oos_profit_factor, n_trades_oos, echantillon_fiable, fiabilite_evaluation, raisons_fiabilite, resultat_json, nom_fichier,
              capital_initial, plateforme, code_source, fichier_original, periode_deja_reglee)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             bot_name,
@@ -3120,6 +3397,8 @@ def _enregistrer_analyse_en_base(bot_name, resultat, strategie_id_force=None, co
             oos.get("profit_factor"),
             oos.get("n_trades"),
             1 if rob.get("echantillon_fiable") else 0,
+            rob.get("fiabilite_evaluation"),
+            json.dumps(rob.get("raisons_fiabilite", []), ensure_ascii=False),
             json.dumps(resultat),
             resultat.get("nom_fichier"),
             resultat.get("capital_initial"),
