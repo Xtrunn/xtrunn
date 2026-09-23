@@ -1712,6 +1712,123 @@ def calculer_max_drawdown_pct(trades, capital_initial=None):
     return float(np.max(dd_pct)) if len(dd_pct) > 0 else 0.0
 
 
+# ============================================================
+# RATIOS DE PERFORMANCE AJUSTÉE AU RISQUE (Sharpe, Sortino, Calmar)
+#
+# Calculés sur une série de rendements JOURNALIERS agrégés (pas trade par
+# trade) pour rester comparables aux conventions financières standard.
+# Seuls les jours ayant eu au moins un trade sont inclus -- pas de
+# remplissage à zéro les jours sans activité -- donc l'annualisation
+# utilise la fréquence de trading RÉELLE de la stratégie plutôt qu'un
+# forfait de 252 jours qui supposerait une activité quotidienne. Une
+# stratégie qui trade un jour sur dix n'a pas la même fréquence
+# d'échantillonnage qu'une stratégie quotidienne, et les traiter pareil
+# fausserait le ratio.
+#
+# HONNÊTETÉ MÉTHODOLOGIQUE : sans taux sans risque connu (XTRUNN ne le
+# demande pas, pour ne pas alourdir le formulaire pour une valeur qui
+# change constamment), le taux de référence utilisé est 0% -- convention
+# usuelle pour l'analyse de stratégies actives, mais qui légèrement
+# surestime le Sharpe/Sortino par rapport à un vrai taux sans risque
+# positif.
+# ============================================================
+
+MIN_JOURS_ACTIFS_RATIOS = 5  # en dessous, la volatilité mesurée n'est pas fiable
+
+
+def calculer_ratios_performance(trades_array, details_list, capital_initial, couverture_temporelle,
+                                  max_equity_drawdown_pct_manuel=None, rendement_benchmark_pct=None,
+                                  couts_reels_payes=None):
+    if len(trades_array) == 0 or not capital_initial or capital_initial <= 0:
+        return None
+
+    dates_brutes = [d.get("date") if isinstance(d, dict) else None for d in details_list]
+    if len(dates_brutes) != len(trades_array) or any(d is None for d in dates_brutes):
+        return None
+
+    dates_parsees, _ = _parse_dates_robuste(dates_brutes, dayfirst_default=True)
+    if dates_parsees.isna().any():
+        return None
+
+    df = pd.DataFrame({"date": dates_parsees.dt.date, "profit": np.asarray(trades_array, dtype=float)})
+    par_jour = df.groupby("date")["profit"].sum().sort_index()
+
+    if len(par_jour) < MIN_JOURS_ACTIFS_RATIOS:
+        return None
+
+    capital_courant = capital_initial
+    rendements = []
+    for profit_jour in par_jour.values:
+        if capital_courant <= 0:
+            break
+        rendements.append(profit_jour / capital_courant)
+        capital_courant += profit_jour
+    rendements = np.array(rendements)
+
+    if len(rendements) < MIN_JOURS_ACTIFS_RATIOS or np.std(rendements) == 0:
+        return None
+
+    span_jours = couverture_temporelle.get("span_jours") if couverture_temporelle else None
+    if span_jours and span_jours > 0:
+        jours_actifs_par_an = len(par_jour) / (span_jours / 365.25)
+    else:
+        jours_actifs_par_an = 252.0  # repli conventionnel si couverture inconnue
+
+    moyenne = float(np.mean(rendements))
+    ecart_type = float(np.std(rendements, ddof=1))
+    sharpe = (moyenne / ecart_type) * math.sqrt(jours_actifs_par_an) if ecart_type > 0 else None
+
+    rendements_negatifs = rendements[rendements < 0]
+    if len(rendements_negatifs) > 0:
+        downside_dev = float(np.sqrt(np.mean(rendements_negatifs ** 2)))
+        sortino = (moyenne / downside_dev) * math.sqrt(jours_actifs_par_an) if downside_dev > 0 else None
+    else:
+        sortino = None  # aucune perte journalière observée -- ratio non défini plutôt qu'infini trompeur
+
+    rendement_total_pct = (capital_courant - capital_initial) / capital_initial * 100
+    if span_jours and span_jours > 0:
+        rendement_annualise_pct = ((1 + rendement_total_pct / 100) ** (365.25 / span_jours) - 1) * 100
+    else:
+        rendement_annualise_pct = None
+
+    # Calmar : privilégie le Max Equity Drawdown SAISI MANUELLEMENT (le vrai
+    # creux, incluant les positions encore ouvertes) s'il est disponible --
+    # sinon repli sur le drawdown calculé par XTRUNN à partir des seuls
+    # trades déjà clôturés, moins précis mais toujours informatif.
+    if max_equity_drawdown_pct_manuel is not None:
+        dd_pour_calmar = max_equity_drawdown_pct_manuel
+        dd_source = "manuel"
+    else:
+        dd_pour_calmar = calculer_max_drawdown_pct(trades_array, capital_initial)
+        dd_source = "calcule"
+
+    calmar = (rendement_annualise_pct / dd_pour_calmar) if (rendement_annualise_pct is not None and dd_pour_calmar and dd_pour_calmar > 0) else None
+
+    excess_return_pct = None
+    if rendement_benchmark_pct is not None:
+        excess_return_pct = round(rendement_total_pct - rendement_benchmark_pct, 2)
+
+    profit_net_simule = float(np.sum(trades_array))
+    profit_net_reel_apres_couts = None
+    if couts_reels_payes is not None:
+        profit_net_reel_apres_couts = round(profit_net_simule - couts_reels_payes, 2)
+
+    return {
+        "sharpe_ratio": round(sharpe, 2) if sharpe is not None else None,
+        "sortino_ratio": round(sortino, 2) if sortino is not None else None,
+        "calmar_ratio": round(calmar, 2) if calmar is not None else None,
+        "rendement_annualise_pct": round(rendement_annualise_pct, 2) if rendement_annualise_pct is not None else None,
+        "rendement_total_pct": round(rendement_total_pct, 2),
+        "jours_actifs_par_an": round(jours_actifs_par_an, 1),
+        "n_jours_actifs": int(len(par_jour)),
+        "dd_utilise_pour_calmar_pct": round(dd_pour_calmar, 2) if dd_pour_calmar else None,
+        "dd_source": dd_source,
+        "excess_return_vs_benchmark_pct": excess_return_pct,
+        "profit_net_simule": round(profit_net_simule, 2),
+        "profit_net_reel_apres_couts": profit_net_reel_apres_couts,
+    }
+
+
 def calculer_statistiques_detaillees(trades, capital_initial=None):
     """
     Statistiques de backtest façon plateforme de trading (MT4/MT5/cTrader) :
@@ -2992,6 +3109,11 @@ def construire_resultat_analyse(
     # de régime de marché (voir la note méthodologique sur la fonction).
     couverture_temporelle = estimer_couverture_temporelle(details_list)
 
+    ratios_performance = calculer_ratios_performance(
+        trades_array, details_list, capital_initial, couverture_temporelle,
+        max_equity_drawdown_pct, rendement_benchmark_pct, couts_reels_payes,
+    )
+
     # Le protocole Standard exige une vraie couverture temporelle -- le
     # nombre de trades, lui, n'est jamais bloquant (une stratégie à
     # faible fréquence n'est pas moins légitime, juste plus lente à
@@ -3279,6 +3401,7 @@ def construire_resultat_analyse(
             "rendement_benchmark_pct": round(rendement_benchmark_pct, 2) if rendement_benchmark_pct is not None else None,
             "couts_reels_payes": round(couts_reels_payes, 2) if couts_reels_payes is not None else None,
         },
+        "ratios_performance": ratios_performance,
         "global": {
             "profit_net": round(profit_global, 2),
             "mdd": round(mdd_global, 2),
