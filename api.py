@@ -2995,24 +2995,10 @@ def construire_resultat_analyse(
     # affichées à l'utilisateur (voir /protocole-standard-dates) : un
     # décalage de quelques jours ne doit jamais faire échouer une analyse
     # pour une simple question de timing.
-    if protocole == "standard":
-        if couverture_temporelle is None:
-            return {"erreur": "Impossible de déterminer la période couverte par cet historique -- vérifiez que les dates de trade sont bien présentes dans le fichier."}
-        if couverture_temporelle["span_jours"] < PROTOCOLE_STANDARD_DUREE_JOURS:
-            return {
-                "erreur": f"Le protocole Standard demande au moins {PROTOCOLE_STANDARD_DUREE_JOURS} jours de couverture "
-                          f"(cet historique n'en couvre que {couverture_temporelle['span_jours']}). "
-                          f"Utilisez le chemin Personnalisé si vous souhaitez tout de même analyser cette période."
-            }
-        date_debut = datetime.strptime(couverture_temporelle["date_debut"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
-        anciennete_jours = (datetime.now(timezone.utc) - date_debut).days
-        if anciennete_jours > PROTOCOLE_STANDARD_ANCIENNETE_MAX_JOURS:
-            return {
-                "erreur": f"Le protocole Standard demande que le premier trade ne remonte pas à plus de "
-                          f"{PROTOCOLE_STANDARD_ANCIENNETE_MAX_JOURS // 365} ans (celui-ci date d'il y a {anciennete_jours} jours). "
-                          f"Les conditions de marché d'une période aussi ancienne ne représentent plus fidèlement le contexte actuel. "
-                          f"Utilisez le chemin Personnalisé si vous souhaitez tout de même analyser cette période."
-            }
+    # La durée/ancienneté du protocole Standard est une RECOMMANDATION de
+    # qualité, pas un blocage : un historique court ou ancien reste analysable.
+    # Les écarts sont remontés plus bas dans la fiabilité/les alertes afin de
+    # ne pas confondre disponibilité des données et robustesse observée.
 
     # 1. Découpage walk-forward + courbe chronologique continue sur
     # l'historique COMPLET (une seule fois), découpée ensuite exactement
