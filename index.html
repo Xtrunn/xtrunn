@@ -975,6 +975,9 @@
             transition: width 0.22s ease;
         }
         .sub-nav.collapsed { width: 72px; }
+        #epreuveRailNav {
+            background: linear-gradient(180deg, rgba(var(--rail-validation-teinte-rgb, 0,0,0), var(--rail-validation-teinte-alpha, 0)), rgba(var(--rail-validation-teinte-rgb, 0,0,0), calc(var(--rail-validation-teinte-alpha, 0) * 0.5))), linear-gradient(180deg, var(--void-2), var(--void));
+        }
 
         /* Bouton plier/déplier -- à cheval sur la bordure du rail, donc
            toujours au même endroit relativement au bord actuel, que le
@@ -2982,12 +2985,19 @@
                 </div>
 
                 <div style="font-size:0.68rem; letter-spacing:1.5px; text-transform:uppercase; color:var(--text-muted); margin:24px 0 10px; padding-top:16px; border-top:1px solid var(--ash);">Mode Validation</div>
-                <div class="panel">
+                <div class="panel" style="margin-bottom:16px;">
                     <div class="panel-title">Couleur du Trou Noir</div>
                     <p style="font-size:0.76rem; color:var(--text-muted); margin:8px 0 14px; line-height:1.5;">
                         La variante « embrasée » du trou noir, visible pendant le suivi d'une épreuve.
                     </p>
                     <div id="paramsNuancesTrouNoirValidation" style="display:flex; flex-wrap:wrap; gap:10px;"></div>
+                </div>
+                <div class="panel">
+                    <div class="panel-title">Couleur du Rail de Navigation</div>
+                    <p style="font-size:0.76rem; color:var(--text-muted); margin:8px 0 14px; line-height:1.5;">
+                        Une teinte appliquée au rail pendant le suivi d'une épreuve, indépendante de celle du mode Analyse.
+                    </p>
+                    <div id="paramsNuancesRailValidation" style="display:flex; flex-wrap:wrap; gap:10px;"></div>
                 </div>
             </div>
 
@@ -4941,7 +4951,7 @@
             }
             const contexteTxt = contexteParts.join(' · ');
             const epreuveBadge = s.n_epreuves_actives > 0
-                ? `<span class="strategy-card-epreuve-badge"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="vertical-align:-1px;"><path d="M12 2 a10 10 0 0 1 7.07 17.07"/></svg> ${s.n_epreuves_actives} validation${s.n_epreuves_actives > 1 ? 's' : ''} en cours</span>`
+                ? `<span class="strategy-card-epreuve-badge"><svg viewBox="0 0 24 24" width="8" height="8" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg> ${s.n_epreuves_actives} validation${s.n_epreuves_actives > 1 ? 's' : ''} en cours</span>`
                 : '';
             const validationBadge = s.validation_reussie
                 ? `<span class="strategy-card-validation-badge" title="Épreuve de Validation réussie le ${formaterDateAffichage(new Date(s.validation_reussie.created_at))} — l'exécution réelle est restée cohérente avec le backtest">✓✓ Validée</span>`
@@ -7193,6 +7203,43 @@
         appliquerCouleurRail(); // dès le chargement
         appliquerCouleurEntete();
 
+        // COULEUR DU RAIL EN MODE VALIDATION -- indépendante de celle du
+        // rail en mode Analyse : #epreuveRailNav et #railNav sont deux
+        // éléments DOM distincts, chacun avec sa propre variable CSS
+        // (voir la règle #epreuveRailNav dédiée), donc aucun conflit
+        // possible entre les deux réglages.
+        let couleurRailValidation = localStorage.getItem('xtrunn_couleur_rail_validation') || null;
+        let dernierPersoRailValidation = localStorage.getItem('xtrunn_dernier_perso_rail_validation') || null;
+
+        function appliquerCouleurRailValidation() {
+            if (couleurRailValidation) {
+                document.documentElement.style.setProperty('--rail-validation-teinte-rgb', couleurRailValidation);
+                document.documentElement.style.setProperty('--rail-validation-teinte-alpha', OPACITE_TEINTE_RAIL);
+            } else {
+                document.documentElement.style.setProperty('--rail-validation-teinte-alpha', '0');
+            }
+        }
+        function rendreNuancesRailValidation() { rendreNuanceGenerique('paramsNuancesRailValidation', couleurRailValidation, dernierPersoRailValidation, 'choisirCouleurRailValidation', 'ouvrirPickerRailValidation'); }
+        function choisirCouleurRailValidation(valeur) {
+            couleurRailValidation = valeur;
+            if (valeur === null) { localStorage.removeItem('xtrunn_couleur_rail_validation'); } else { localStorage.setItem('xtrunn_couleur_rail_validation', valeur); }
+            appliquerCouleurRailValidation();
+            rendreNuancesRailValidation();
+        }
+        function ouvrirPickerRailValidation(declencheur) {
+            const actuel = couleurRailValidation ? rgbVersHex(couleurRailValidation) : (dernierPersoRailValidation || (document.documentElement.getAttribute('data-theme') === 'clair' ? '#141416' : '#ece9e4'));
+            ouvrirSelecteurCouleurPerso(declencheur, actuel,
+                (hex) => { document.documentElement.style.setProperty('--rail-validation-teinte-rgb', hexVersRgb(hex)); document.documentElement.style.setProperty('--rail-validation-teinte-alpha', OPACITE_TEINTE_RAIL); },
+                () => {
+                    const hex = '#' + document.getElementById('colorPickerHexInput').value;
+                    ajouterHistoriqueCouleur(hex);
+                    dernierPersoRailValidation = hex;
+                    try { localStorage.setItem('xtrunn_dernier_perso_rail_validation', hex); } catch (err) { /* stockage indisponible, tant pis */ }
+                    choisirCouleurRailValidation(hexVersRgb(hex));
+                });
+        }
+        appliquerCouleurRailValidation(); // dès le chargement
+
         function rendreNuancesTrouNoir() {
             const conteneur = document.getElementById('paramsNuancesTrouNoir');
             const defautClasse = couleurTrouNoir === null ? ' selectionnee' : '';
@@ -7379,6 +7426,7 @@
                 rendreNuancesTrouNoirValidation();
                 rendreNuancesAccent();
                 rendreNuancesRail();
+                rendreNuancesRailValidation();
                 rendreNuancesEntete();
             } else if (categorie === 'devise') {
                 document.getElementById('parametresTitreActuel').textContent = 'Devise';
