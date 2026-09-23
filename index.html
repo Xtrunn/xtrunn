@@ -2948,6 +2948,8 @@
                         <button type="button" class="protocole-toggle-btn param-theme-btn" data-valeur="clair" onclick="choisirTheme('clair')" style="flex:1; padding:12px; border-radius:8px;">Clair</button>
                     </div>
                 </div>
+
+                <div style="font-size:0.68rem; letter-spacing:1.5px; text-transform:uppercase; color:var(--text-muted); margin:24px 0 10px; padding-top:16px; border-top:1px solid var(--ash);">Global</div>
                 <div class="panel" style="margin-bottom:16px;">
                     <div class="panel-title">Couleur d'Accent</div>
                     <p style="font-size:0.76rem; color:var(--text-muted); margin:8px 0 14px; line-height:1.5;">
@@ -2955,19 +2957,21 @@
                     </p>
                     <div id="paramsNuancesAccent" style="display:flex; flex-wrap:wrap; gap:10px;"></div>
                 </div>
+                <div class="panel">
+                    <div class="panel-title">Couleur de l'En-tête</div>
+                    <p style="font-size:0.76rem; color:var(--text-muted); margin:8px 0 14px; line-height:1.5;">
+                        Une teinte appliquée à l'en-tête, indépendante de celle du rail. Par défaut : neutre, sans teinte.
+                    </p>
+                    <div id="paramsNuancesEntete" style="display:flex; flex-wrap:wrap; gap:10px;"></div>
+                </div>
+
+                <div style="font-size:0.68rem; letter-spacing:1.5px; text-transform:uppercase; color:var(--text-muted); margin:24px 0 10px; padding-top:16px; border-top:1px solid var(--ash);">Mode Analyse</div>
                 <div class="panel" style="margin-bottom:16px;">
-                    <div class="panel-title">Couleur du Trou Noir — Mode Analyse</div>
+                    <div class="panel-title">Couleur du Trou Noir</div>
                     <p style="font-size:0.76rem; color:var(--text-muted); margin:8px 0 14px; line-height:1.5;">
                         L'anneau et le disque qui apparaissent dans le logo et à l'écran d'accueil.
                     </p>
                     <div id="paramsNuancesTrouNoir" style="display:flex; flex-wrap:wrap; gap:10px;"></div>
-                </div>
-                <div class="panel">
-                    <div class="panel-title">Couleur du Trou Noir — Mode Validation</div>
-                    <p style="font-size:0.76rem; color:var(--text-muted); margin:8px 0 14px; line-height:1.5;">
-                        La variante « embrasée » du trou noir, visible pendant le suivi d'une épreuve.
-                    </p>
-                    <div id="paramsNuancesTrouNoirValidation" style="display:flex; flex-wrap:wrap; gap:10px;"></div>
                 </div>
                 <div class="panel">
                     <div class="panel-title">Couleur du Rail de Navigation</div>
@@ -2976,12 +2980,14 @@
                     </p>
                     <div id="paramsNuancesRail" style="display:flex; flex-wrap:wrap; gap:10px;"></div>
                 </div>
+
+                <div style="font-size:0.68rem; letter-spacing:1.5px; text-transform:uppercase; color:var(--text-muted); margin:24px 0 10px; padding-top:16px; border-top:1px solid var(--ash);">Mode Validation</div>
                 <div class="panel">
-                    <div class="panel-title">Couleur de l'En-tête</div>
+                    <div class="panel-title">Couleur du Trou Noir</div>
                     <p style="font-size:0.76rem; color:var(--text-muted); margin:8px 0 14px; line-height:1.5;">
-                        Une teinte appliquée à l'en-tête, indépendante de celle du rail. Par défaut : neutre, sans teinte.
+                        La variante « embrasée » du trou noir, visible pendant le suivi d'une épreuve.
                     </p>
-                    <div id="paramsNuancesEntete" style="display:flex; flex-wrap:wrap; gap:10px;"></div>
+                    <div id="paramsNuancesTrouNoirValidation" style="display:flex; flex-wrap:wrap; gap:10px;"></div>
                 </div>
             </div>
 
