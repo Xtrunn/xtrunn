@@ -1829,6 +1829,106 @@ def calculer_ratios_performance(trades_array, details_list, capital_initial, cou
     }
 
 
+# ============================================================
+# SCORE DE QUALITÉ / PERFORMANCE — DISTINCT DU SCORE DE ROBUSTESSE
+#
+# Le score de Robustesse (les 4 piliers existants) répond à une seule
+# question : "ce backtest est-il probablement le fruit d'un
+# surapprentissage, ou tient-il la route sur des données que
+# l'optimisation n'a pas vues ?" Il ne dit RIEN sur si la stratégie est
+# bonne dans l'absolu -- une stratégie à peine rentable peut être
+# parfaitement stable et donc bien notée en Robustesse.
+#
+# Le score de Qualité répond à une question différente : "si ce backtest
+# se reproduit fidèlement, est-ce que ça vaut la peine d'être tradé ?"
+#
+# Les deux scores ne sont JAMAIS recombinés en un seul chiffre : un score
+# global unique réintroduirait exactement la confusion qu'on cherche à
+# éviter (un lecteur presse ne retient qu'un chiffre, peu importe
+# comment il a été calculé). Affichés côte à côte, sans hiérarchie.
+# ============================================================
+
+POIDS_QUALITE_PROFIT_FACTOR = 40
+POIDS_QUALITE_SHARPE = 30
+POIDS_QUALITE_CALMAR = 30
+
+
+def _score_par_paliers(valeur, paliers):
+    """Interpolation linéaire par morceaux : paliers = liste de (seuil, score_a_ce_seuil),
+    triée par seuil croissant. En dessous du premier seuil : 0. Au-dessus du dernier : le score max."""
+    if valeur <= paliers[0][0]:
+        return 0.0
+    for i in range(1, len(paliers)):
+        seuil_bas, score_bas = paliers[i - 1]
+        seuil_haut, score_haut = paliers[i]
+        if valeur <= seuil_haut:
+            ratio = (valeur - seuil_bas) / (seuil_haut - seuil_bas)
+            return score_bas + ratio * (score_haut - score_bas)
+    return paliers[-1][1]
+
+
+def calculer_score_qualite(oos_profit_factor, ratios_performance):
+    """
+    Score 0-100 distinct, jamais mélangé au score de Robustesse. Repose sur
+    trois axes complémentaires : le Profit Factor (marge de profitabilité
+    brute), le Sharpe (rendement ajusté à la volatilité moyenne) et le
+    Calmar (rendement ajusté au pire drawdown) -- trois façons différentes
+    de juger si le résultat est bon, pas juste stable.
+
+    Retourne None si les ratios de performance n'ont pas pu être calculés
+    (historique trop épars en jours actifs distincts) : un score partiel
+    construit sur un seul axe donnerait une fausse impression de mesure
+    complète.
+    """
+    if ratios_performance is None:
+        return None
+
+    score_pf = _score_par_paliers(oos_profit_factor, [
+        (1.0, 0), (1.3, 15), (2.0, 30), (3.0, POIDS_QUALITE_PROFIT_FACTOR),
+    ])
+
+    sharpe = ratios_performance.get("sharpe_ratio")
+    if sharpe is not None:
+        score_sharpe = _score_par_paliers(sharpe, [
+            (0.0, 0), (1.0, 15), (2.0, 25), (3.0, POIDS_QUALITE_SHARPE),
+        ])
+    else:
+        score_sharpe = None
+
+    calmar = ratios_performance.get("calmar_ratio")
+    if calmar is not None:
+        score_calmar = _score_par_paliers(calmar, [
+            (0.5, 0), (1.0, 10), (3.0, 25), (5.0, POIDS_QUALITE_CALMAR),
+        ])
+    else:
+        score_calmar = None
+
+    # Si Sharpe ou Calmar manque (cas rare : rendements journaliers valides
+    # mais drawdown nul par exemple), on redistribue son poids sur le
+    # Profit Factor plutôt que d'inventer une valeur -- jamais de score
+    # partiel présenté comme complet sans le signaler.
+    composantes_actives = [("pf", score_pf, POIDS_QUALITE_PROFIT_FACTOR)]
+    poids_total = POIDS_QUALITE_PROFIT_FACTOR
+    if score_sharpe is not None:
+        composantes_actives.append(("sharpe", score_sharpe, POIDS_QUALITE_SHARPE))
+        poids_total += POIDS_QUALITE_SHARPE
+    if score_calmar is not None:
+        composantes_actives.append(("calmar", score_calmar, POIDS_QUALITE_CALMAR))
+        poids_total += POIDS_QUALITE_CALMAR
+
+    score_brut = sum(s for _, s, _ in composantes_actives)
+    score_final = int(round(score_brut / poids_total * 100)) if poids_total > 0 else 0
+    score_final = max(0, min(100, score_final))
+
+    return {
+        "score": score_final,
+        "score_profit_factor": round(score_pf, 1),
+        "score_sharpe": round(score_sharpe, 1) if score_sharpe is not None else None,
+        "score_calmar": round(score_calmar, 1) if score_calmar is not None else None,
+        "oos_profit_factor_utilise": round(oos_profit_factor, 2),
+    }
+
+
 def calculer_statistiques_detaillees(trades, capital_initial=None):
     """
     Statistiques de backtest façon plateforme de trading (MT4/MT5/cTrader) :
@@ -3402,6 +3502,7 @@ def construire_resultat_analyse(
             "couts_reels_payes": round(couts_reels_payes, 2) if couts_reels_payes is not None else None,
         },
         "ratios_performance": ratios_performance,
+        "qualite_performance": calculer_score_qualite(oos_pf, ratios_performance),
         "global": {
             "profit_net": round(profit_global, 2),
             "mdd": round(mdd_global, 2),
