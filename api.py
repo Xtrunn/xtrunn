@@ -2914,6 +2914,10 @@ def construire_resultat_analyse(
     n_windows: int = N_WINDOWS_DEFAULT,
     is_ratio: float = IS_RATIO_DEFAULT,
     n_trials_testes: int = None,
+    max_equity_drawdown_pct: float = None,
+    n_parametres_libres: int = None,
+    rendement_benchmark_pct: float = None,
+    couts_reels_payes: float = None,
 ):
     """Calcule une analyse complète à partir des octets d'un fichier de
     trades, sans aucun effet de bord (ni écriture en base, ni id attribué).
@@ -3269,6 +3273,12 @@ def construire_resultat_analyse(
         "oos_capital_ref": round(oos_capital_ref, 2),
         "seuils_surveillance": seuils_surveillance,
         "ratio_risque_recompense": ratio_risque_recompense,
+        "donnees_manuelles": {
+            "max_equity_drawdown_pct": round(max_equity_drawdown_pct, 2) if max_equity_drawdown_pct is not None else None,
+            "n_parametres_libres": int(n_parametres_libres) if n_parametres_libres is not None else None,
+            "rendement_benchmark_pct": round(rendement_benchmark_pct, 2) if rendement_benchmark_pct is not None else None,
+            "couts_reels_payes": round(couts_reels_payes, 2) if couts_reels_payes is not None else None,
+        },
         "global": {
             "profit_net": round(profit_global, 2),
             "mdd": round(mdd_global, 2),
@@ -3388,11 +3398,16 @@ async def analyser(
     n_trials_testes: int = Form(None),
     strategie_id: int = Form(None),
     code_source: str = Form(None),
+    max_equity_drawdown_pct: float = Form(None),
+    n_parametres_libres: int = Form(None),
+    rendement_benchmark_pct: float = Form(None),
+    couts_reels_payes: float = Form(None),
 ):
     contents = await trades_file.read()
     resultat = construire_resultat_analyse(
         contents, trades_file.filename, bot_name, plateforme, capital_initial,
         protocole, n_windows, is_ratio, n_trials_testes,
+        max_equity_drawdown_pct, n_parametres_libres, rendement_benchmark_pct, couts_reels_payes,
     )
     if "erreur" in resultat:
         return resultat
