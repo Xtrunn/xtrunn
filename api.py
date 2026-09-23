@@ -986,23 +986,38 @@ def estimer_couverture_temporelle(details_list):
 # ============================================================
 
 def decouper_fenetres_walkforward(trades_array, details_list, n_windows, is_ratio):
-    """
-    Découpe l'historique COMPLET et CHRONOLOGIQUE des trades en n_windows
-    fenêtres consécutives, non chevauchantes. Dans chaque fenêtre, la
-    première portion (is_ratio) sert de période de référence (IS), le
-    reste (immédiatement après, dans le temps) de période de test (OOS).
-    La dernière fenêtre absorbe le reliquat de la division entière.
+    """Découpe une série déjà normalisée en fenêtres chronologiques contiguës.
+
+    Le découpage est équilibré en *nombre de trades*, pas en durée calendaire.
+    Cela garantit une quantité de données comparable par fenêtre sans inventer
+    une durée fixe pour les stratégies à fréquence variable. Chaque fenêtre
+    contient une portion Référence (IS), puis immédiatement la portion Test
+    (OOS). Les fenêtres ne se chevauchent pas et couvrent exactement tout
+    l'historique.
+
+    Important : les OOS de fenêtres successives ne sont PAS contigus dans le
+    temps, car la période IS de la fenêtre suivante se trouve entre les deux.
+    Les métriques de trajectoire doivent donc utiliser les segments séparément.
     """
     total = len(trades_array)
-    taille_fenetre = total // n_windows
+    if total != len(details_list):
+        raise ValueError("Impossible de découper les fenêtres : trades et détails désalignés.")
+    if n_windows <= 0:
+        raise ValueError("Le nombre de fenêtres doit être positif.")
+
+    # np.array_split répartit le reliquat sur les premières fenêtres et évite
+    # qu'une dernière fenêtre anormalement longue absorbe tous les trades restants.
+    bornes = np.array_split(np.arange(total), n_windows)
     fenetres = []
-    for w in range(n_windows):
-        debut = w * taille_fenetre
-        fin = (w + 1) * taille_fenetre if w < n_windows - 1 else total
+    for w, indices in enumerate(bornes, start=1):
+        if len(indices) == 0:
+            raise ValueError(f"Fenêtre {w} vide : historique insuffisant pour ce nombre de fenêtres.")
+        debut = int(indices[0])
+        fin = int(indices[-1]) + 1
         fin_is = debut + int(round((fin - debut) * is_ratio))
-        fin_is = max(debut, min(fin, fin_is))
+        fin_is = max(debut + 1, min(fin - 1, fin_is))
         fenetres.append({
-            "index": w + 1,
+            "index": w,
             "debut": debut, "fin_is": fin_is, "fin": fin,
             "is_trades": trades_array[debut:fin_is],
             "oos_trades": trades_array[fin_is:fin],
@@ -1092,7 +1107,7 @@ def analyser_pilier_is_oos(fenetres, oos_trades_all):
         warnings.append({"level": "critical", "message": "La stratégie est globalement perdante sur l'ensemble des périodes de test — le signal le plus grave qui soit."})
     elif stability_ratio < 0.5:
         score = 5
-        warnings.append({"level": "critical", "message": f"Surapprentissage marqué : la stratégie perd la grande majorité de son efficacité en dehors des données utilisées pour la régler (ratio {stability_ratio:.2f}, sous 0.5). Signe classique d'une stratégie trop calée sur son passé."})
+        warnings.append({"level": "critical", "message": f"Forte dégradation hors période de référence : l'efficacité OOS est nettement inférieure à celle observée en référence (ratio {stability_ratio:.2f}, sous 0.5). Ce profil est compatible avec une forte dépendance aux conditions de la période de référence."})
     elif stability_ratio < 0.7:
         score = 12
         warnings.append({"level": "warning", "message": f"Baisse de performance notable en dehors des données de réglage (ratio {stability_ratio:.2f}) — à surveiller."})
@@ -1281,12 +1296,20 @@ def analyser_pilier_concentration(oos_trades):
     score = POIDS_CONCENTRATION
     warnings = []
 
+    if len(oos_trades[oos_trades < 0]) == 0:
+        warnings.append({
+            "level": "warning",
+            "message": "Aucune perte observée sur les périodes de test : les métriques fondées sur les pertes ne peuvent pas être vérifiées sur cet échantillon."
+        })
+
     if concentration_pct > 70:
         score -= 15
-        warnings.append({"level": "critical", "message": f"Effet loterie marqué : les 10% de trades les plus rentables génèrent à eux seuls {concentration_pct:.1f}% du profit total — la stratégie repose peut-être sur quelques coups isolés plutôt que sur un avantage répété."})
+        suffix = " Ce pourcentage peut dépasser 100% lorsque les pertes importantes ailleurs dans l'échantillon réduisent fortement le profit net." if concentration_pct > 100 else ""
+        warnings.append({"level": "critical", "message": f"Concentration élevée : les 10% de trades les plus rentables génèrent à eux seuls {concentration_pct:.1f}% du profit net — ce résultat dépend fortement d'un petit sous-ensemble de trades.{suffix}"})
     elif concentration_pct > 50:
         score -= 8
-        warnings.append({"level": "warning", "message": f"Concentration notable des profits : {concentration_pct:.1f}% du gain total vient des 10% de trades les plus rentables."})
+        suffix = " Ce pourcentage peut dépasser 100% lorsque les pertes importantes ailleurs dans l'échantillon réduisent fortement le profit net." if concentration_pct > 100 else ""
+        warnings.append({"level": "warning", "message": f"Concentration notable des profits : {concentration_pct:.1f}% du profit net vient des 10% de trades les plus rentables.{suffix}"})
 
     return {
         "score": max(0, score),
@@ -1495,42 +1518,42 @@ def evaluer_risque_de_ruine(trades, volumes=None):
     payoff_ratio = (gain_moyen / abs(perte_moyenne)) if perte_moyenne != 0 else None
 
     alertes = []
-    mult = 1.0
 
-    # Signal 1 : winrate élevé + ratio gain/perte très faible — "ramasser
-    # des pièces devant un rouleau compresseur".
+    # Ces signaux sont diagnostiques uniquement. Ils ne modifient jamais le
+    # score global : certains recouvrent déjà le Pilier 3 (risque/DD), et les
+    # données de trades seules ne permettent pas d'établir un risque de ruine.
+    # On conserve leur valeur pour l'interface et le rapport.
+
+    # Signal 1 : winrate élevé + ratio gain/perte très faible.
     signal_payoff = bool(payoff_ratio is not None and winrate >= RUIN_WINRATE_SEUIL and payoff_ratio < RUIN_PAYOFF_SEUIL)
     if signal_payoff:
-        mult *= 0.6
         alertes.append({
             "level": "critical",
-            "message": f"Signal de risque de ruine : winrate élevé ({winrate:.0f}%) combiné à des gains faibles face aux pertes ({payoff_ratio:.2f}) — profil typique d'une gestion des positions qui accumule de petits gains fréquents contre un risque de perte rare mais démesurée."
+            "message": f"Signal de gestion du risque à examiner : winrate élevé ({winrate:.0f}%) combiné à des gains faibles face aux pertes ({payoff_ratio:.2f}) — profil compatible avec une exposition à des pertes rares mais importantes."
         })
 
     # Signal 2 : escalade des pertes au sein des séries.
     pct_escalade, n_sequences = detecter_pertes_escalade(trades)
     signal_escalade = bool(n_sequences >= 2 and pct_escalade >= RUIN_ESCALADE_SEUIL_PCT)
     if signal_escalade:
-        mult *= 0.7
         alertes.append({
             "level": "critical",
-            "message": f"Signal de risque de ruine : {pct_escalade:.0f}% des séries de pertes consécutives montrent une perte qui s'aggrave progressivement — cohérent avec une taille de position qui augmente après chaque perte, un mécanisme qui peut mener à la ruine du compte."
+            "message": f"Escalade des pertes observée : {pct_escalade:.0f}% des séries de pertes consécutives montrent une perte qui s'aggrave progressivement — signal à vérifier dans la logique de taille de position."
         })
 
     # Signal 3 : queue de distribution anormalement lourde.
     ratio_queue = (abs(plus_grosse_perte) / abs(perte_moyenne)) if perte_moyenne != 0 else None
     signal_queue = bool(ratio_queue is not None and ratio_queue >= RUIN_QUEUE_SEUIL)
     if signal_queue:
-        mult *= 0.75
         alertes.append({
             "level": "warning",
-            "message": f"Perte extrême isolée : la plus grosse perte du backtest ({plus_grosse_perte:.2f}) est {ratio_queue:.1f}x plus importante que la perte moyenne — un événement rare de cette ampleur, s'il ne s'était pas produit exactement pendant la période testée, aurait pu passer totalement inaperçu."
+            "message": f"Perte extrême isolée : la plus grosse perte du backtest ({plus_grosse_perte:.2f}) est {ratio_queue:.1f}x plus importante que la perte moyenne — la distribution observée comporte donc une perte nettement plus importante que les autres."
         })
 
     # Signal 4 : escalade RÉELLE du volume au sein des séries de pertes —
     # seul signal direct de ce module (les 3 précédents sont des
-    # inférences statistiques). Pénalité plus forte car c'est une preuve,
-    # pas une simple présomption. Disponible seulement si la plateforme a
+    # inférences statistiques). Le signal est plus direct, mais il ne constitue
+    # pas à lui seul une preuve de martingale ou de risque de ruine. Disponible seulement si la plateforme a
     # exporté les tailles de position.
     signal_volume = False
     pct_volume_escalade = None
@@ -1541,18 +1564,15 @@ def evaluer_risque_de_ruine(trades, volumes=None):
             pct_volume_escalade, n_sequences_volume = detecter_volume_escalade(trades, volumes)
             signal_volume = bool(n_sequences_volume >= 2 and pct_volume_escalade >= RUIN_ESCALADE_SEUIL_PCT)
             if signal_volume:
-                mult *= 0.5
                 alertes.append({
                     "level": "critical",
-                    "message": f"Risque de ruine CONFIRMÉ : {pct_volume_escalade:.0f}% des séries de pertes consécutives montrent une taille de position qui augmente réellement après chaque perte — lu directement dans vos données de volume, pas une simple présomption statistique."
+                    "message": f"Escalade de taille observée : {pct_volume_escalade:.0f}% des séries de pertes consécutives montrent une taille de position qui augmente selon le critère testé — signal directement observé dans les données de volume, à vérifier dans le money management."
                 })
 
     cohesion_volume = evaluer_cohesion_volume(volumes) if volumes is not None else None
 
-    mult = round(max(0.4, mult), 3)  # plancher : ne jamais annuler le score sur ce seul signal, qui reste indirect
-
     return {
-        "mult_risque_ruine": mult,
+        "mult_risque_ruine": 1.0,  # rétrocompatibilité API ; aucun multiplicateur n'est appliqué
         "winrate": round(winrate, 1),
         "payoff_ratio": round(payoff_ratio, 2) if payoff_ratio is not None else None,
         "pct_sequences_escalade": pct_escalade,
@@ -1614,9 +1634,15 @@ def calculer_fourchette_score(fenetres, rng, n_replicates=N_CI_REPLICATES, n_per
             scores[i] = 0
             continue
 
-        mc_r = executer_monte_carlo(oos_resample, rng, num_simulations=n_perms_inner)
+        # Conserver les fenêtres comme segments pour les métriques
+        # path-dependent : un bootstrap ne doit pas recréer artificiellement
+        # une continuité entre deux blocs temporels distincts.
+        segments_bootstrap = [f["oos_trades"] for f in fenetres_bootstrap]
+        mc_r = executer_monte_carlo(
+            oos_resample, rng, num_simulations=n_perms_inner, segments=segments_bootstrap
+        )
         p2_r = analyser_pilier_is_oos(fenetres_bootstrap, oos_resample)
-        p3_r = analyser_pilier_risque_drawdown(oos_resample)
+        p3_r = analyser_pilier_risque_drawdown(oos_resample, segments=segments_bootstrap)
         p4_r = analyser_pilier_concentration(oos_resample)
 
         total = mc_r["score"] + p2_r["score"] + p3_r["score"] + p4_r["score"]
@@ -2851,6 +2877,14 @@ PARSERS_PLATEFORME = {
     "autre": lire_trades_generique,
 }
 
+def obtenir_parser_plateforme(plateforme):
+    """Retourne le parser explicite de la plateforme, sans fallback silencieux."""
+    cle = str(plateforme or "").strip().lower()
+    parser = PARSERS_PLATEFORME.get(cle)
+    if parser is None:
+        raise HTTPException(status_code=400, detail=f"Plateforme non prise en charge : {plateforme}")
+    return parser
+
 @app.get("/protocole-standard-dates")
 async def obtenir_dates_protocole_standard():
     """Les dates exactes à backtester pour le protocole Standard,
@@ -2911,7 +2945,7 @@ def construire_resultat_analyse(
     if is_ratio < IS_RATIO_MIN or is_ratio > IS_RATIO_MAX:
         return {"erreur": f"Le ratio Référence/Test par fenêtre doit être compris entre {int(IS_RATIO_MIN*100)}% et {int(IS_RATIO_MAX*100)}%."}
 
-    parser = PARSERS_PLATEFORME.get(plateforme, lire_trades_mt5)
+    parser = obtenir_parser_plateforme(plateforme)
 
     trades_array, details_list, err = parser(contents, filename)
     if err:
@@ -3179,18 +3213,24 @@ def construire_resultat_analyse(
             "message": f"À titre informatif (n'affecte pas le score) : {n_trials_testes} variantes testées avant celle-ci — voir 'Biais de Sélection' dans le Diagnostic."
         })
 
-    if not echantillon_fiable:
+    if fiabilite_evaluation["statut"] == "insuffisante":
         toutes_les_alertes.insert(0, {
             "level": "critical",
-            "message": f"Trop peu de trades pour être fiable : seulement {len(oos_trades)} trades testés hors de la période de réglage (minimum recommandé : {MIN_TRADES_RELIABLE}). "
-                       f"Le score est plafonné à 50 par précaution — un résultat sur un aussi petit nombre de trades peut facilement être dû au hasard."
+            "pilier": "diagnostics",
+            "message": fiabilite_evaluation["raisons"][0] + " La robustesse calculée reste affichée, mais sa portée interprétative est très limitée."
+        })
+    elif fiabilite_evaluation["statut"] == "limitée":
+        toutes_les_alertes.insert(0, {
+            "level": "warning",
+            "pilier": "diagnostics",
+            "message": fiabilite_evaluation["raisons"][0] + " Interprétez le score avec davantage de prudence."
         })
     if couverture_temporelle is not None:
         span = couverture_temporelle["span_jours"]
         if span < SPAN_JOURS_CRITIQUE:
             toutes_les_alertes.append({
                 "level": "critical", "pilier": "diagnostics",
-                "message": f"Historique très court : seulement {span} jours au total. Il y a très peu de chances qu'une période aussi courte ait traversé des conditions de marché vraiment différentes (hausse, baisse, calme, agité) — un bon score ici est donc moins solide que sur un historique plus long."
+                "message": f"Historique très court : seulement {span} jours au total. Une période aussi courte offre une couverture limitée des conditions de marché observées — la portée interprétative du score est donc réduite."
             })
         elif span < SPAN_JOURS_AVERTISSEMENT:
             toutes_les_alertes.append({
@@ -3200,7 +3240,7 @@ def construire_resultat_analyse(
     if mc_res["path_sensitivity_ratio"] is not None and mc_res["path_sensitivity_ratio"] >= 2.5:
         toutes_les_alertes.append({
             "level": "warning", "pilier": "montecarlo",
-            "message": f"Le drawdown observé a peut-être eu de la chance dans l'ordre des trades : en le testant sur des milliers d'ordres différents des mêmes trades, il aurait pu être jusqu'à {mc_res['path_sensitivity_ratio']:.1f}x plus élevé dans un scénario pessimiste plausible."
+            "message": f"Le drawdown observé dépend sensiblement de l'ordre des trades : parmi les réordonnancements testés, un scénario pessimiste plausible atteint jusqu'à {mc_res['path_sensitivity_ratio']:.1f}x le drawdown observé."
         })
     if mc_res["stress_recovery_factor"] is not None and mc_res["stress_recovery_factor"] < 1.0:
         toutes_les_alertes.append({
@@ -3217,7 +3257,12 @@ def construire_resultat_analyse(
             "level": "critical", "pilier": "stresspro",
             "message": "En simulant des frais de courtage/spread plus élevés, la stratégie devient déficitaire — sa marge est trop fine pour absorber des conditions réelles un peu moins favorables."
         })
-    if not rolling_res["rolling_stable"]:
+    if rolling_res.get("rolling_insuffisant", False):
+        toutes_les_alertes.append({
+            "level": "info", "pilier": "stresspro",
+            "message": "Historique insuffisant pour tester la stabilité temporelle avec les fenêtres rolling configurées — aucune conclusion d'instabilité ne peut être tirée de ce test."
+        })
+    elif not rolling_res["rolling_stable"]:
         toutes_les_alertes.append({
             "level": "warning", "pilier": "stresspro",
             "message": f"Instabilité dans le temps : seulement {rolling_res['rolling_profitable_pct']}% des périodes de l'historique sont individuellement rentables — la performance globale repose peut-être sur une seule bonne période plutôt que d'être régulière."
@@ -3412,7 +3457,7 @@ def calculer_score_epreuve(epreuve, violations, profit_pct, drawdown_pct, consis
     l'exécution, pas seulement si l'objectif a été coché. Seule une
     VRAIE VIOLATION DE RÈGLE (drawdown, perte quotidienne, régularité)
     ramène le score à 0 — pas de demi-mesure sur un risque dépassé,
-    cohérent avec la psychologie réelle d'un prop firm.
+    cohérent avec le fonctionnement d'une épreuve à règles de risque strictes.
 
     Ne pas atteindre l'objectif de profit dans les temps, SANS avoir
     enfreint la moindre règle, reste un échec du VERDICT (l'épreuve
@@ -4114,8 +4159,8 @@ def calculer_robustesse_ordre(epreuve_row, trades, rng, n_replicates=N_CI_REPLIC
     """Monte Carlo sur l'ORDRE RÉEL des trades de l'épreuve : les mêmes
     résultats, mais dans un ordre différent, auraient-ils quand même
     validé l'épreuve ? Un pourcentage bas révèle un verdict qui a
-    peut-être tenu grâce à la chance de l'enchaînement plutôt qu'à une
-    vraie marge de sécurité."""
+    peut-être dépendu fortement de l'ordre d'enchaînement plutôt que d'une
+    marge de sécurité stable."""
     n = len(trades)
     if n < 5:
         return None
@@ -4476,7 +4521,7 @@ async def verifier_retroactivement(
         raise HTTPException(status_code=400, detail="Le capital de départ est requis.")
 
     contents = await trades_file.read()
-    parser = PARSERS_PLATEFORME.get(plateforme, lire_trades_mt5)
+    parser = obtenir_parser_plateforme(plateforme)
     trades_array, detail_list, err = parser(contents, trades_file.filename)
     if err:
         return {"erreur": err}
@@ -4487,7 +4532,10 @@ async def verifier_retroactivement(
         if not date_brute:
             continue
         try:
-            date_parsee = pd.to_datetime(date_brute).strftime("%Y-%m-%d")
+            parsed_date, _ = _parse_dates_robuste([date_brute], dayfirst_default={"mt4": True, "mt5": True, "ctrader": True}.get(str(plateforme or "").strip().lower()))
+            if parsed_date.iloc[0] is pd.NaT or pd.isna(parsed_date.iloc[0]):
+                continue
+            date_parsee = parsed_date.iloc[0].strftime("%Y-%m-%d")
         except Exception:
             continue
         trades.append({"date": date_parsee, "profit": float(d.get("profit", 0.0))})
@@ -4521,7 +4569,7 @@ async def importer_trades_epreuve(
         raise HTTPException(status_code=404, detail="Epreuve introuvable.")
 
     contents = await trades_file.read()
-    parser = PARSERS_PLATEFORME.get(plateforme, lire_trades_mt5)
+    parser = obtenir_parser_plateforme(plateforme)
     trades_array, detail_list, err = parser(contents, trades_file.filename)
     if err:
         return {"erreur": err}
@@ -4533,7 +4581,10 @@ async def importer_trades_epreuve(
         if not date_brute:
             continue
         try:
-            date_parsee = pd.to_datetime(date_brute).strftime("%Y-%m-%d")
+            parsed_date, _ = _parse_dates_robuste([date_brute], dayfirst_default={"mt4": True, "mt5": True, "ctrader": True}.get(str(plateforme or "").strip().lower()))
+            if parsed_date.iloc[0] is pd.NaT or pd.isna(parsed_date.iloc[0]):
+                continue
+            date_parsee = parsed_date.iloc[0].strftime("%Y-%m-%d")
         except Exception:
             continue
         conn.execute(
