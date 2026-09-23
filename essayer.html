@@ -1891,6 +1891,26 @@
                         </p>
                         <input type="number" id="nTrialsTestes" placeholder="ex: 1 — laissez vide si non applicable" min="1" step="1">
                     </div>
+                    <div style="display:flex; gap:15px; flex-wrap:wrap; margin-top:16px;">
+                        <div class="input-group" style="flex:1; min-width:200px; margin-bottom:0;">
+                            <label>Max Equity Drawdown (%) <span class="info-tip" data-tip="Le vrai creux le plus bas atteint par votre équity, tel que calculé par votre plateforme -- inclut les positions encore ouvertes en cours de route, contrairement au drawdown calculé par XTRUNN à partir des seuls trades déjà clôturés. Trouvable dans le rapport de backtest de votre plateforme (souvent nommé 'Max Drawdown' ou 'Equity Drawdown').">?</span></label>
+                            <input type="number" id="maxEquityDrawdownPct" placeholder="ex: 18.5 — laissez vide si inconnu" min="0" max="100" step="0.1">
+                        </div>
+                        <div class="input-group" style="flex:1; min-width:200px; margin-bottom:0;">
+                            <label>Paramètres Libres de la Stratégie <span class="info-tip" data-tip="Le nombre de réglages ajustables dans votre stratégie (période d'un indicateur, seuils d'entrée/sortie, multiplicateurs...), distinct du nombre d'essais déclaré plus haut. Plus une stratégie a de degrés de liberté, plus le risque structurel de surapprentissage est élevé -- même en n'ayant testé qu'une seule combinaison.">?</span></label>
+                            <input type="number" id="nParametresLibres" placeholder="ex: 4 — laissez vide si non applicable" min="0" step="1">
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:15px; flex-wrap:wrap; margin-top:16px;">
+                        <div class="input-group" style="flex:1; min-width:200px; margin-bottom:0;">
+                            <label>Rendement du Benchmark (%) <span class="info-tip" data-tip="Le rendement d'un indice ou d'un simple achat-conservation (buy & hold) sur exactement la même période que votre backtest. Sert à vérifier que votre stratégie apporte un vrai avantage, plutôt que de simplement profiter d'un marché haussier pendant la période testée.">?</span></label>
+                            <input type="number" id="rendementBenchmarkPct" placeholder="ex: 12.0 — laissez vide si non applicable" step="0.1">
+                        </div>
+                        <div class="input-group" style="flex:1; min-width:200px; margin-bottom:0;">
+                            <label>Coûts Réels Payés ($) <span class="info-tip" data-tip="Le total des commissions, spreads et slippage réellement payés sur la période, si vous l'avez (relevé du courtier). Remplace notre estimation simulée par un chiffre exact quand il est disponible.">?</span></label>
+                            <input type="number" id="coutsReelsPayes" placeholder="ex: 340 — laissez vide si inconnu" step="0.01">
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -3383,6 +3403,14 @@
             formData.append("is_ratio", (parseFloat(isRatioPct) / 100).toFixed(2));
             const nTrials = document.getElementById('nTrialsTestes').value;
             if (nTrials) formData.append("n_trials_testes", nTrials);
+            const maxEqDD = document.getElementById('maxEquityDrawdownPct').value;
+            if (maxEqDD) formData.append("max_equity_drawdown_pct", maxEqDD);
+            const nParams = document.getElementById('nParametresLibres').value;
+            if (nParams) formData.append("n_parametres_libres", nParams);
+            const benchmark = document.getElementById('rendementBenchmarkPct').value;
+            if (benchmark) formData.append("rendement_benchmark_pct", benchmark);
+            const coutsReels = document.getElementById('coutsReelsPayes').value;
+            if (coutsReels) formData.append("couts_reels_payes", coutsReels);
 
             try {
                 const response = await fetch('/demo/analyser', { method: 'POST', body: formData });
