@@ -1908,14 +1908,83 @@ def calculer_score_qualite(oos_profit_factor, ratios_performance):
 #     seule fenêtre walk-forward, contrairement au Pilier 3 de Robustesse)
 # ============================================================
 
-POIDS_RISQUE_MDD = 25
-POIDS_RISQUE_RECOVERY = 25
-POIDS_RISQUE_SIGNAUX_RUINE = 25
+POIDS_RISQUE_MDD = 20
+POIDS_RISQUE_RECOVERY = 20
+POIDS_RISQUE_SIGNAUX_RUINE = 20
 POIDS_RISQUE_COUTS = 15
 POIDS_RISQUE_SERIE_PERTES = 10
+POIDS_RISQUE_DUREE_DD = 15
 
 
-def calculer_score_risque(mdd_pct, mdd_source, stress_recovery_factor, risque_ruine_res, costs_res, max_pertes_consecutives_absolu):
+# ============================================================
+# DURÉE DU DRAWDOWN -- complète le Max Drawdown en %
+#
+# Un -20% qui se referme en 2 semaines et un -20% qui prend 8 mois sont
+# deux situations très différentes pour la viabilité d'une stratégie en
+# argent réel (support psychologique, coût d'opportunité, marge de
+# manœuvre) alors qu'ils sont indiscernables sur la seule amplitude du
+# drawdown. Mesure le plus long "temps sous l'eau" : le nombre de jours
+# calendaires entre un pic d'équity et le moment où un nouveau pic est
+# atteint.
+# ============================================================
+
+def calculer_duree_drawdown(trades_array, details_list, capital_initial):
+    if len(trades_array) == 0 or not capital_initial or capital_initial <= 0:
+        return None
+
+    dates_brutes = [d.get("date") if isinstance(d, dict) else None for d in details_list]
+    if len(dates_brutes) != len(trades_array) or any(d is None for d in dates_brutes):
+        return None
+
+    dates_parsees, _ = _parse_dates_robuste(dates_brutes, dayfirst_default=True)
+    if dates_parsees.isna().any():
+        return None
+
+    df = pd.DataFrame({"date": dates_parsees.dt.date, "profit": np.asarray(trades_array, dtype=float)})
+    par_jour = df.groupby("date")["profit"].sum().sort_index()
+
+    if len(par_jour) < 2:
+        return None
+
+    equity = (capital_initial + par_jour.cumsum()).tolist()
+    dates_index = list(par_jour.index)
+
+    pic_valeur = equity[0]
+    pic_date = dates_index[0]
+    plus_longue_duree = 0
+    periode_debut, periode_fin = None, None
+    sous_leau_debut = None
+
+    for date_i, val_i in zip(dates_index, equity):
+        if val_i >= pic_valeur:
+            if sous_leau_debut is not None:
+                duree = (date_i - sous_leau_debut).days
+                if duree > plus_longue_duree:
+                    plus_longue_duree = duree
+                    periode_debut, periode_fin = sous_leau_debut, date_i
+                sous_leau_debut = None
+            pic_valeur = val_i
+            pic_date = date_i
+        elif sous_leau_debut is None:
+            sous_leau_debut = pic_date
+
+    toujours_en_cours = False
+    if sous_leau_debut is not None:
+        duree = (dates_index[-1] - sous_leau_debut).days
+        if duree >= plus_longue_duree:
+            plus_longue_duree = duree
+            periode_debut, periode_fin = sous_leau_debut, dates_index[-1]
+            toujours_en_cours = True
+
+    return {
+        "duree_max_jours": int(plus_longue_duree),
+        "periode_debut": periode_debut.strftime("%Y-%m-%d") if periode_debut else None,
+        "periode_fin": periode_fin.strftime("%Y-%m-%d") if periode_fin else None,
+        "toujours_en_cours_a_la_fin": toujours_en_cours,
+    }
+
+
+def calculer_score_risque(mdd_pct, mdd_source, stress_recovery_factor, risque_ruine_res, costs_res, max_pertes_consecutives_absolu, duree_drawdown_res=None):
     """Score 0-100 distinct, jamais mélangé aux deux autres diagnostics."""
     avertissements = []
 
@@ -1976,12 +2045,32 @@ def calculer_score_risque(mdd_pct, mdd_source, stress_recovery_factor, risque_ru
     else:
         score_serie = None
 
+    # Axe 6 : durée du plus long temps sous l'eau -- complète l'amplitude
+    # du drawdown (axe 1) par sa persistance dans le temps.
+    duree_jours = duree_drawdown_res.get("duree_max_jours") if duree_drawdown_res else None
+    if duree_jours is not None:
+        if duree_jours <= 30:
+            score_duree = float(POIDS_RISQUE_DUREE_DD)
+        elif duree_jours <= 90:
+            score_duree = POIDS_RISQUE_DUREE_DD - (duree_jours - 30) / 60 * (POIDS_RISQUE_DUREE_DD - 10)
+        elif duree_jours <= 180:
+            score_duree = 10 - (duree_jours - 90) / 90 * 5
+        elif duree_jours <= 365:
+            score_duree = 5 - (duree_jours - 180) / 185 * 5
+        else:
+            score_duree = 0.0
+        if duree_drawdown_res.get("toujours_en_cours_a_la_fin"):
+            avertissements.append(f"Le plus long temps sous l'eau ({duree_jours} jours) n'était pas encore terminé à la fin de l'historique testé -- le vrai pire cas pourrait être plus long.")
+    else:
+        score_duree = None
+
     composantes = [
         ("mdd", score_mdd, POIDS_RISQUE_MDD),
         ("recovery", score_recovery, POIDS_RISQUE_RECOVERY),
         ("signaux_ruine", score_signaux, POIDS_RISQUE_SIGNAUX_RUINE),
         ("couts", score_couts, POIDS_RISQUE_COUTS),
         ("serie_pertes", score_serie, POIDS_RISQUE_SERIE_PERTES),
+        ("duree_dd", score_duree, POIDS_RISQUE_DUREE_DD),
     ]
     composantes_actives = [(nom, s, poids) for nom, s, poids in composantes if s is not None]
     if not composantes_actives:
@@ -1998,6 +2087,9 @@ def calculer_score_risque(mdd_pct, mdd_source, stress_recovery_factor, risque_ru
         "score_signaux_ruine": round(score_signaux, 1),
         "score_couts": round(score_couts, 1) if score_couts is not None else None,
         "score_serie_pertes": round(score_serie, 1) if score_serie is not None else None,
+        "score_duree_dd": round(score_duree, 1) if score_duree is not None else None,
+        "duree_dd_jours": duree_jours,
+        "duree_dd_toujours_en_cours": bool(duree_drawdown_res.get("toujours_en_cours_a_la_fin")) if duree_drawdown_res else False,
         "n_signaux_ruine_actifs": n_signaux,
         "mdd_utilise_pct": round(mdd_pct, 2) if mdd_pct is not None else None,
         "mdd_source": mdd_source,
@@ -3450,6 +3542,7 @@ def construire_resultat_analyse(
     # "52 correct", puisque la Robustesse basse signifie précisément
     # qu'on ne peut pas faire confiance au chiffre de Qualité.
     qualite_perf_res = calculer_score_qualite(oos_pf, ratios_performance)
+    duree_dd_res = calculer_duree_drawdown(oos_trades, oos_detail, oos_capital_ref)
     risque_res = calculer_score_risque(
         max_equity_drawdown_pct if max_equity_drawdown_pct is not None else stats_oos["mdd_pct"],
         "manuel" if max_equity_drawdown_pct is not None else "calcule",
@@ -3457,6 +3550,7 @@ def construire_resultat_analyse(
         risque_ruine_res,
         costs_res,
         stats_oos["max_pertes_consecutives"],
+        duree_dd_res,
     )
     scores_disponibles = [score_global]
     if qualite_perf_res is not None:
