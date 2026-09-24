@@ -1977,6 +1977,57 @@ POIDS_RISQUE_DUREE_DD = 15
 # atteint.
 # ============================================================
 
+# ============================================================
+# VENTILATION PAR INSTRUMENT -- signal de diversification, purement
+# informatif, jamais noté.
+#
+# De nombreuses stratégies légitimes ne tradent qu'un seul instrument --
+# ce n'est pas en soi un défaut, et pénaliser ça pénaliserait à tort la
+# majorité des stratégies. L'intérêt est de rendre visible, pour les
+# stratégies qui tradent PLUSIEURS instruments, si la performance repose
+# en réalité sur un seul symbole plutôt que d'être vraiment répartie --
+# un signal différent de la Concentration (Pilier 4), qui regarde la
+# répartition entre TRADES, pas entre INSTRUMENTS.
+# ============================================================
+
+def analyser_ventilation_instruments(details_list):
+    if not details_list:
+        return None
+
+    symboles_connus = sum(1 for d in details_list if d and d.get("symbole"))
+    if symboles_connus < len(details_list) * 0.5:
+        return None  # trop peu de trades avec un symbole connu pour être fiable
+
+    df = pd.DataFrame([d for d in details_list if d])
+    if "symbole" not in df.columns or "profit" not in df.columns:
+        return None
+    df = df[df["symbole"].notna() & (df["symbole"].astype(str).str.strip() != "")]
+    if df.empty:
+        return None
+
+    par_symbole = df.groupby("symbole")["profit"].agg(["sum", "count"]).reset_index()
+    par_symbole.columns = ["symbole", "profit_total", "n_trades"]
+    par_symbole = par_symbole.sort_values("profit_total", ascending=False)
+
+    profit_total_tous = float(par_symbole["profit_total"].sum())
+
+    ventilation = []
+    for _, row in par_symbole.iterrows():
+        pct = (float(row["profit_total"]) / profit_total_tous * 100) if profit_total_tous != 0 else 0.0
+        ventilation.append({
+            "symbole": str(row["symbole"]),
+            "profit_total": round(float(row["profit_total"]), 2),
+            "n_trades": int(row["n_trades"]),
+            "pct_profit_total": round(pct, 1),
+        })
+
+    return {
+        "n_instruments": len(ventilation),
+        "ventilation": ventilation,
+        "concentration_pct_top_instrument": ventilation[0]["pct_profit_total"] if ventilation else None,
+    }
+
+
 def calculer_duree_drawdown(trades_array, details_list, capital_initial):
     if len(trades_array) == 0 or not capital_initial or capital_initial <= 0:
         return None
@@ -3766,6 +3817,7 @@ def construire_resultat_analyse(
         "oos_capital_ref": round(oos_capital_ref, 2),
         "seuils_surveillance": seuils_surveillance,
         "ratio_risque_recompense": ratio_risque_recompense,
+        "ventilation_instruments": analyser_ventilation_instruments(details_list),
         "donnees_manuelles": {
             "max_equity_drawdown_pct": round(max_equity_drawdown_pct, 2) if max_equity_drawdown_pct is not None else None,
             "n_parametres_libres": int(n_parametres_libres) if n_parametres_libres is not None else None,
