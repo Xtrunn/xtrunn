@@ -68,8 +68,18 @@ POIDS_CONCENTRATION = 20
 # l'ordre des trades (pire_mdd_95 simulé / drawdown réel observé).
 # <= RATIO_PATH_BON : le drawdown réel est représentatif, pas de "chance" d'ordre -> score plein
 # >= RATIO_PATH_MAUVAIS : le drawdown réel a été très favorisé par son enchaînement -> score nul
+#
+# Seuils ancrés dans deux sources indépendantes qui citent un ratio de 2x
+# (pire drawdown simulé au 95e percentile / drawdown réel) comme le point
+# où un backtest cesse d'être fiable : "un ratio DD95/drawdown historique
+# robuste doit rester sous 2 ; au-delà, le backtest historique [n'est plus
+# fiable]" (backtrex.com, guide Monte Carlo) et "si le drawdown simulé à
+# 95% dépasse deux fois le drawdown du backtest, c'est un signal de risque
+# important" (adventuresofgreg.blog). RATIO_PATH_MAUVAIS = 2.5 (pas
+# exactement 2.0) pour garder une petite marge de score dégressif plutôt
+# qu'un couperet brutal juste au-dessus du seuil "robuste" cité.
 RATIO_PATH_BON = 1.5
-RATIO_PATH_MAUVAIS = 4.0
+RATIO_PATH_MAUVAIS = 2.5
 # Garde-fou : un ratio élevé peut être un artefact mathématique quand le
 # drawdown réel est minuscule (diviser par un chiffre proche de zéro fait
 # exploser n'importe quel écart, même négligeable en valeur absolue). Si
@@ -1857,6 +1867,14 @@ def calculer_ratios_performance(trades_array, details_list, capital_initial, cou
 POIDS_QUALITE_PROFIT_FACTOR = 40
 POIDS_QUALITE_SHARPE = 30
 POIDS_QUALITE_CALMAR = 30
+# Le plafond de score (PF >= 3.0 -> score plein) reste inchangé -- il
+# correspond à la fourchette "très bon/robuste" citée par plusieurs
+# sources. Mais au-delà de ce seuil-ci, le consensus de ces mêmes sources
+# est qu'un PF aussi élevé devient lui-même suspect (signe probable de
+# surapprentissage ou d'échantillon trop petit), pas un signe de qualité
+# supplémentaire. Ce n'est PAS le rôle du score Qualité de sanctionner ça
+# (c'est celui de la Robustesse) -- seulement de le signaler honnêtement.
+SEUIL_PF_SUSPICIEUSEMENT_ELEVE = 4.0
 
 
 def _score_par_paliers(valeur, paliers):
@@ -1932,6 +1950,7 @@ def calculer_score_qualite(oos_profit_factor, ratios_performance):
         "score_sharpe": round(score_sharpe, 1) if score_sharpe is not None else None,
         "score_calmar": round(score_calmar, 1) if score_calmar is not None else None,
         "oos_profit_factor_utilise": round(oos_profit_factor, 2),
+        "pf_suspicieusement_eleve": bool(oos_profit_factor >= SEUIL_PF_SUSPICIEUSEMENT_ELEVE),
     }
 
 
