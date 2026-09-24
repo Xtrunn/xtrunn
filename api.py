@@ -1301,6 +1301,9 @@ RUIN_WINRATE_SEUIL = 75.0        # % de trades gagnants au-delà duquel une stra
 RUIN_PAYOFF_SEUIL = 0.35         # ...le ratio gain moyen / perte moyenne tombe sous ce seuil
 RUIN_ESCALADE_SEUIL_PCT = 50.0   # % des séries de pertes consécutives montrant une aggravation
 RUIN_QUEUE_SEUIL = 6.0           # perte la plus grosse = X fois la perte moyenne
+RUIN_SKEW_SEUIL = -1.0           # asymétrie en dessous de laquelle la distribution penche vers de grosses pertes rares
+RUIN_KURTOSIS_SEUIL = 3.0        # aplatissement en excès au-delà duquel les valeurs extrêmes sont plus fréquentes que pour une distribution normale
+MIN_TRADES_ASYMETRIE = 20        # sous ce seuil, les moments d'ordre 3/4 sont trop instables pour être fiables
 
 
 def detecter_pertes_escalade(trades):
@@ -1453,6 +1456,32 @@ def evaluer_ratio_risque_recompense(details):
     }
 
 
+def calculer_asymetrie_aplatissement(trades):
+    """
+    Asymétrie (skewness) et aplatissement en excès (excess kurtosis) de la
+    distribution des profits/pertes. Complète le ratio de queue déjà
+    présent (qui ne regarde que LA plus grosse perte isolée) par une vraie
+    mesure de la FORME de toute la distribution : une asymétrie fortement
+    négative signifie que les pertes extrêmes, même sans être uniques,
+    tirent la distribution vers le bas de façon disproportionnée -- le
+    profil statistique typique d'une stratégie qui accumule de petits
+    gains contre un risque de perte rare mais démesurée (vente d'options,
+    martingale). Sous MIN_TRADES_ASYMETRIE, ces moments d'ordre 3 et 4
+    sont trop instables pour être interprétables.
+    """
+    n = len(trades)
+    if n < MIN_TRADES_ASYMETRIE:
+        return None, None
+    moyenne = float(np.mean(trades))
+    ecart_type = float(np.std(trades, ddof=0))
+    if ecart_type == 0:
+        return None, None
+    ecarts_standardises = (trades - moyenne) / ecart_type
+    skew = float(np.mean(ecarts_standardises ** 3))
+    kurtosis_exces = float(np.mean(ecarts_standardises ** 4) - 3)
+    return skew, kurtosis_exces
+
+
 def evaluer_risque_de_ruine(trades, volumes=None):
     n = len(trades)
     if n < 10:
@@ -1461,6 +1490,7 @@ def evaluer_risque_de_ruine(trades, volumes=None):
             "pct_sequences_escalade": 0.0, "n_sequences_pertes": 0, "ratio_queue": None,
             "signal_payoff": False, "signal_escalade": False, "signal_queue": False,
             "signal_volume": False, "pct_volume_escalade": None, "n_sequences_volume": 0,
+            "signal_distribution": False, "skew": None, "kurtosis_exces": None,
             "cohesion_volume": None,
             "alertes": [],
         }
@@ -1526,6 +1556,22 @@ def evaluer_risque_de_ruine(trades, volumes=None):
                     "message": f"Escalade de taille observée : {pct_volume_escalade:.0f}% des séries de pertes consécutives montrent une taille de position qui augmente selon le critère testé — signal directement observé dans les données de volume, à vérifier dans le money management."
                 })
 
+    # Signal 5 : forme de toute la distribution, pas juste sa plus grosse
+    # perte isolée (contrairement au Signal 3). Une asymétrie fortement
+    # négative combinée à un aplatissement marqué signale statistiquement
+    # que les pertes extrêmes sont plus fréquentes et plus lourdes que ne
+    # le voudrait une distribution équilibrée.
+    skew, kurtosis_exces = calculer_asymetrie_aplatissement(trades)
+    signal_distribution = bool(
+        skew is not None and kurtosis_exces is not None
+        and skew <= RUIN_SKEW_SEUIL and kurtosis_exces >= RUIN_KURTOSIS_SEUIL
+    )
+    if signal_distribution:
+        alertes.append({
+            "level": "warning",
+            "message": f"Distribution asymétrique vers les pertes : l'asymétrie ({skew:.2f}) et l'aplatissement ({kurtosis_exces:.2f}) de la distribution des trades indiquent que les pertes extrêmes sont statistiquement plus fréquentes et plus marquées que ne le voudrait une distribution équilibrée."
+        })
+
     cohesion_volume = evaluer_cohesion_volume(volumes) if volumes is not None else None
 
     return {
@@ -1541,6 +1587,9 @@ def evaluer_risque_de_ruine(trades, volumes=None):
         "signal_volume": signal_volume,
         "pct_volume_escalade": pct_volume_escalade,
         "n_sequences_volume": n_sequences_volume,
+        "signal_distribution": signal_distribution,
+        "skew": round(skew, 2) if skew is not None else None,
+        "kurtosis_exces": round(kurtosis_exces, 2) if kurtosis_exces is not None else None,
         "cohesion_volume": cohesion_volume,
         "alertes": alertes,
     }
@@ -2018,6 +2067,7 @@ def calculer_score_risque(mdd_pct, mdd_source, stress_recovery_factor, risque_ru
         bool(risque_ruine_res.get("signal_escalade")),
         bool(risque_ruine_res.get("signal_queue")),
         bool(risque_ruine_res.get("signal_volume")),
+        bool(risque_ruine_res.get("signal_distribution")),
     ])
     score_signaux = max(0.0, POIDS_RISQUE_SIGNAUX_RUINE - n_signaux * (POIDS_RISQUE_SIGNAUX_RUINE / 3))
     if n_signaux > 0:
@@ -3809,6 +3859,9 @@ def construire_resultat_analyse(
             "ruine_signal_volume": risque_ruine_res["signal_volume"],
             "ruine_pct_volume_escalade": risque_ruine_res["pct_volume_escalade"],
             "ruine_cohesion_volume": risque_ruine_res["cohesion_volume"],
+            "ruine_signal_distribution": risque_ruine_res["signal_distribution"],
+            "ruine_skew": risque_ruine_res["skew"],
+            "ruine_kurtosis_exces": risque_ruine_res["kurtosis_exces"],
             "score_fourchette": fourchette,
             "score_monte_carlo": score_mc,
             "score_stabilite_is_oos": pilier2_res["score"],
