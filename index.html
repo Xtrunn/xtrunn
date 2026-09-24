@@ -4028,7 +4028,7 @@
             document.getElementById('p1ScoreDisplay').textContent = `${rob.score_monte_carlo} / 30`;
             document.getElementById('p1ScorePath').textContent = `${mc.score_path} / 15`;
             document.getElementById('p1ScoreRecovery').textContent = `${mc.score_recovery} / 15`;
-            document.getElementById('mcInterpretation').textContent = interpreterMonteCarlo(mc.stress_recovery_factor, mc.path_sensitivity_ratio);
+            document.getElementById('mcInterpretation').textContent = interpreterMonteCarlo(mc.stress_recovery_factor, mc.path_sensitivity_ratio, mc.plancher_absolu_applique);
 
             document.getElementById('p2ScoreDisplay').textContent = `${rob.score_stabilite_is_oos} / 30`;
             document.getElementById('p2StabilityRatio').textContent = rob.stability_ratio;
@@ -4435,11 +4435,16 @@
             return phrases[cat] + faiblesTxt;
         }
 
-        function interpreterMonteCarlo(recovery, pathRatio) {
+        function interpreterMonteCarlo(recovery, pathRatio, plancherApplique) {
             const cat = categoriser(recovery, [1, 3, 5]);
             rendreJaugeRepere('mcJauge', cat);
             if (recovery === null || recovery === undefined) return "Impossible de calculer le facteur de récupération (pas de drawdown simulé exploitable).";
-            const pathTxt = (pathRatio !== null && pathRatio !== undefined && pathRatio >= 4.0) ? ` Le drawdown réellement observé semble aussi avoir bénéficié d'un enchaînement de trades favorable (${pathRatio.toFixed(2)}x) — un signal de prudence supplémentaire.` : '';
+            let pathTxt = '';
+            if (pathRatio !== null && pathRatio !== undefined && pathRatio >= 4.0) {
+                pathTxt = plancherApplique
+                    ? ` Le ratio de sensibilité de trajectoire est techniquement élevé (${pathRatio.toFixed(2)}x), mais le pire drawdown simulé reste négligeable en valeur absolue — le score n'est donc pas pénalisé comme si ce ratio signalait un vrai risque.`
+                    : ` Le drawdown réellement observé semble aussi avoir bénéficié d'un enchâînement de trades favorable (${pathRatio.toFixed(2)}x) — un signal de prudence supplémentaire.`;
+            }
             const phrases = [
                 `Un facteur de récupération de ${recovery.toFixed(2)} signifie que le profit ne couvre même pas le pire drawdown simulé — la marge de sécurité est insuffisante.`,
                 `Un facteur de récupération de ${recovery.toFixed(2)} couvre le pire drawdown simulé, mais sans grande marge de sécurité.`,
@@ -8248,7 +8253,7 @@ Profit Factor Test (toutes fenêtres) : ${rob.oos_profit_factor}
 Fenêtres faibles (< 0.5) : ${rob.fenetres_faibles_pct}%
 
 --- PILIER 2 — SENSIBILITÉ DE TRAJECTOIRE / MONTE CARLO (${mc.score_path} / 30) ---
-${interpreterMonteCarlo(mc.stress_recovery_factor, mc.path_sensitivity_ratio)}
+${interpreterMonteCarlo(mc.stress_recovery_factor, mc.path_sensitivity_ratio, mc.plancher_absolu_applique)}
 Pire Max DD simulé (95%) : -${Math.abs(mc.pire_mdd_95).toFixed(2)} ${d}
 Sensibilité du drawdown : ${mc.path_sensitivity_ratio !== null ? mc.path_sensitivity_ratio.toFixed(2) + 'x' : 'N/A'}
 Facteur de récupération : ${mc.stress_recovery_factor !== null ? mc.stress_recovery_factor.toFixed(2) : 'N/A'}
