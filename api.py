@@ -70,6 +70,17 @@ POIDS_CONCENTRATION = 20
 # >= RATIO_PATH_MAUVAIS : le drawdown réel a été très favorisé par son enchaînement -> score nul
 RATIO_PATH_BON = 1.5
 RATIO_PATH_MAUVAIS = 4.0
+# Garde-fou : un ratio élevé peut être un artefact mathématique quand le
+# drawdown réel est minuscule (diviser par un chiffre proche de zéro fait
+# exploser n'importe quel écart, même négligeable en valeur absolue). Si
+# le pire drawdown simulé (95e percentile) reste sous ces seuils du
+# capital, un plancher s'applique malgré un mauvais ratio -- la détection
+# reste utile pour les vrais cas dangereux (petit drawdown réel qui cache
+# un pire cas à 20-30%), sans punir un pire cas objectivement négligeable.
+SEUIL_MDD_ABSOLU_NEGLIGEABLE_PCT = 2.0
+SEUIL_MDD_ABSOLU_FAIBLE_PCT = 5.0
+PLANCHER_MDD_NEGLIGEABLE = 0.8
+PLANCHER_MDD_FAIBLE = 0.5
 # Facteur de récupération (profit net / pire drawdown simulé à 95%) jugé "confortable"
 RECOVERY_FACTOR_CIBLE = 3.0
 
@@ -3382,6 +3393,26 @@ def construire_resultat_analyse(
         return round(valeur / oos_capital_ref * 100, 2)
 
     mc_res["pire_mdd_95_pct"] = pct(mc_res["pire_mdd_95"])
+
+    # Garde-fou : voir la note sur SEUIL_MDD_ABSOLU_NEGLIGEABLE_PCT. Ne
+    # remonte le score que si le calcul par ratio l'a fait tomber plus bas
+    # que ce que justifie l'ampleur réelle du pire cas simulé -- ne peut
+    # jamais faire baisser le score, seulement corriger une pénalité
+    # disproportionnée par rapport au risque réel.
+    if mc_res["pire_mdd_95_pct"] <= SEUIL_MDD_ABSOLU_NEGLIGEABLE_PCT:
+        plancher_mc = POIDS_MONTE_CARLO * PLANCHER_MDD_NEGLIGEABLE
+    elif mc_res["pire_mdd_95_pct"] <= SEUIL_MDD_ABSOLU_FAIBLE_PCT:
+        plancher_mc = POIDS_MONTE_CARLO * PLANCHER_MDD_FAIBLE
+    else:
+        plancher_mc = 0
+    if mc_res["score"] < plancher_mc:
+        mc_res["score"] = int(round(plancher_mc))
+        mc_res["score_path"] = mc_res["score"]
+        mc_res["plancher_absolu_applique"] = True
+        score_mc = mc_res["score"]
+    else:
+        mc_res["plancher_absolu_applique"] = False
+
     fragilite_res["bootstrap_mediane_profit_pct"] = pct(fragilite_res["bootstrap_mediane_profit"])
     fragilite_res["bootstrap_pire_profit_5pct_pct"] = pct(fragilite_res["bootstrap_pire_profit_5pct"])
     fragilite_res["bootstrap_pire_mdd_pct"] = pct(fragilite_res["bootstrap_pire_mdd"])
@@ -3665,6 +3696,7 @@ def construire_resultat_analyse(
             "path_sensitivity_ratio": mc_res["path_sensitivity_ratio"],
             "stress_recovery_factor": mc_res["stress_recovery_factor"],
             "score_path": mc_res["score_path"],
+            "plancher_absolu_applique": mc_res["plancher_absolu_applique"],
         },
         "stress_pro_bootstrap": fragilite_res,
         "stress_pro_costs": costs_res,
