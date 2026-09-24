@@ -73,17 +73,6 @@ RATIO_PATH_MAUVAIS = 4.0
 # Facteur de récupération (profit net / pire drawdown simulé à 95%) jugé "confortable"
 RECOVERY_FACTOR_CIBLE = 3.0
 
-# Pilier 2 — plafond de qualité absolue basé sur le Profit Factor OOS.
-# Une stratégie parfaitement stable IS->OOS mais à peine rentable en absolu
-# (PF proche de 1) ne doit pas obtenir le score plein du pilier stabilité.
-# Paliers progressifs (pas de couperet brutal) : (seuil_pf_min, multiplicateur)
-PALIERS_QUALITE_ABSOLUE = [
-    (1.30, 1.00),
-    (1.15, 0.85),
-    (1.05, 0.60),
-    (1.00, 0.35),
-]
-
 # Fourchette de confiance du score global (bootstrap avec remise sur l'OOS)
 N_CI_REPLICATES = 150     # nombre de répliques bootstrap pour la fourchette
 N_CI_PERMS_INNER = 40     # permutations Monte Carlo internes par réplique (allégé pour la perf)
@@ -476,28 +465,6 @@ def calculer_profit_factor(trades):
     return float(PF_SENTINELLE_AUCUNE_PERTE if gains > 0 else 0.0)
 
 
-def qualite_absolue_multiplicateur(oos_pf):
-    """
-    Plafond de qualité absolue (Pilier 2) : une stratégie peut être parfaitement
-    stable entre IS et OOS (ratio d'efficacité proche de 1) tout en étant à
-    peine rentable dans l'absolu. Sans ce plafond, un Profit Factor OOS de
-    1.02 obtiendrait le même score qu'un PF de 2.0 du moment que la stabilité
-    est bonne — ce qui n'a pas de sens pour un utilisateur qui doit décider
-    de passer en compte réel. Paliers progressifs plutôt qu'un couperet net.
-    """
-    # PF_SENTINELLE_AUCUNE_PERTE représente le cas particulier « aucun trade
-    # perdant ». Il ne doit surtout pas être traité comme un PF réel de 0.1 :
-    # sinon une stratégie sans perte voit artificiellement son pilier de
-    # stabilité multiplié par 0, alors que le cas doit simplement être
-    # évalué par les autres épreuves (concentration, coûts, trajectoire, etc.).
-    if oos_pf == PF_SENTINELLE_AUCUNE_PERTE:
-        return 1.0
-
-    for seuil, mult in PALIERS_QUALITE_ABSOLUE:
-        if oos_pf >= seuil:
-            return mult
-    return 0.0
-
 
 # ============================================================
 # PILIER 1 : STRESS MONTE CARLO — SENSIBILITÉ DE TRAJECTOIRE
@@ -582,30 +549,25 @@ def executer_monte_carlo(trades, rng, num_simulations=N_SIMULATIONS_MC, segments
     ratio_path = max(ratios_par_fenetre) if ratios_par_fenetre else float('inf')
     recovery = min(recovery_par_fenetre) if recovery_par_fenetre else 0.0
 
-    poids_a = POIDS_MONTE_CARLO // 2
-    poids_b = POIDS_MONTE_CARLO - poids_a
-
+    # Tout le poids du pilier va à la sensibilité de trajectoire : "ce
+    # drawdown est-il représentatif, ou dépend-il d'un enchaînement
+    # chanceux". Le facteur de récupération reste calculé et exposé
+    # (utilisé par le score de Risque) mais ne note plus la Robustesse --
+    # "le gain justifie-t-il l'ampleur du risque" est une question de
+    # risque, pas de robustesse.
     if ratio_path <= RATIO_PATH_BON:
-        score_path = poids_a
+        score_path = POIDS_MONTE_CARLO
     elif ratio_path >= RATIO_PATH_MAUVAIS:
         score_path = 0
     else:
-        score_path = int(round(poids_a * (1 - (ratio_path - RATIO_PATH_BON) / (RATIO_PATH_MAUVAIS - RATIO_PATH_BON))))
-
-    if recovery >= RECOVERY_FACTOR_CIBLE:
-        score_recovery = poids_b
-    elif recovery <= 0:
-        score_recovery = 0
-    else:
-        score_recovery = int(round(min(poids_b, max(0, (recovery / RECOVERY_FACTOR_CIBLE) * poids_b))))
+        score_path = int(round(POIDS_MONTE_CARLO * (1 - (ratio_path - RATIO_PATH_BON) / (RATIO_PATH_MAUVAIS - RATIO_PATH_BON))))
 
     return {
         "pire_mdd_95": round(pire_mdd_95, 2),
         "path_sensitivity_ratio": round(ratio_path, 2) if ratio_path != float('inf') else None,
         "stress_recovery_factor": round(recovery, 2) if recovery != float('inf') else None,
-        "score": int(score_path + score_recovery),
+        "score": int(score_path),
         "score_path": int(score_path),
-        "score_recovery": int(score_recovery),
         "mc_scope": "oos_segments",
         "mc_segments_testes": len(fenetres_valides),
     }
@@ -619,7 +581,6 @@ def _executer_monte_carlo_pooled(trades, rng, num_simulations=N_SIMULATIONS_MC):
             "stress_recovery_factor": None,
             "score": 0,
             "score_path": 0,
-            "score_recovery": 0,
         }
 
     max_drawdowns = np.empty(num_simulations)
@@ -634,42 +595,33 @@ def _executer_monte_carlo_pooled(trades, rng, num_simulations=N_SIMULATIONS_MC):
     oos_net = float(np.sum(trades))
     oos_mdd_reel = calculer_max_drawdown(trades)
 
-    poids_a = POIDS_MONTE_CARLO // 2
-    poids_b = POIDS_MONTE_CARLO - poids_a
-
-    # (A) Sensibilité du drawdown réel à l'ordre des trades
+    # (A) Sensibilité du drawdown réel à l'ordre des trades -- tout le poids du pilier.
     if oos_mdd_reel > 0:
         ratio_path = pire_mdd_95 / oos_mdd_reel
     else:
         ratio_path = (pire_mdd_95 / oos_net) if oos_net > 0 else float('inf')
 
     if ratio_path <= RATIO_PATH_BON:
-        score_path = poids_a
+        score_path = POIDS_MONTE_CARLO
     elif ratio_path >= RATIO_PATH_MAUVAIS:
         score_path = 0
     else:
-        score_path = int(round(poids_a * (1 - (ratio_path - RATIO_PATH_BON) / (RATIO_PATH_MAUVAIS - RATIO_PATH_BON))))
+        score_path = int(round(POIDS_MONTE_CARLO * (1 - (ratio_path - RATIO_PATH_BON) / (RATIO_PATH_MAUVAIS - RATIO_PATH_BON))))
 
-    # (B) Facteur de récupération sous le pire drawdown simulé (95e percentile)
+    # (B) Facteur de récupération sous le pire drawdown simulé (95e
+    # percentile) -- calculé et exposé pour le score de Risque, ne note
+    # plus la Robustesse.
     if pire_mdd_95 > 0:
         recovery = oos_net / pire_mdd_95
     else:
         recovery = float('inf') if oos_net > 0 else 0.0
 
-    if recovery >= RECOVERY_FACTOR_CIBLE:
-        score_recovery = poids_b
-    elif recovery <= 0:
-        score_recovery = 0
-    else:
-        score_recovery = int(round(min(poids_b, max(0, (recovery / RECOVERY_FACTOR_CIBLE) * poids_b))))
-
     return {
         "pire_mdd_95": round(pire_mdd_95, 2),
         "path_sensitivity_ratio": round(ratio_path, 2) if ratio_path != float('inf') else None,
         "stress_recovery_factor": round(recovery, 2) if recovery != float('inf') else None,
-        "score": int(score_path + score_recovery),
+        "score": int(score_path),
         "score_path": int(score_path),
-        "score_recovery": int(score_recovery),
     }
 
 
@@ -1128,18 +1080,12 @@ def analyser_pilier_is_oos(fenetres, oos_trades_all):
             "message": f"Résultats inégaux selon les périodes testées : {fenetres_faibles_pct:.0f}% d'entre elles montrent un net surapprentissage, malgré une moyenne correcte. La performance ne semble pas également reproductible dans le temps."
         })
 
-    # Plafond de qualité absolue, basé sur le Profit Factor calculé sur
-    # l'ensemble des trades OOS de toutes les fenêtres concaténées.
+    # Le Profit Factor OOS reste calculé et exposé (utilisé notamment par
+    # le score de Qualité) mais ne module plus le score de Stabilité --
+    # une question de rentabilité absolue n'a pas sa place dans un score
+    # qui répond uniquement à "ce résultat tient-il d'une fenêtre à
+    # l'autre", pas "ce résultat est-il bon dans l'absolu".
     oos_pf = calculer_profit_factor(oos_trades_all) if len(oos_trades_all) > 0 else 0.0
-    if profit_oos_total > 0:
-        mult = qualite_absolue_multiplicateur(oos_pf)
-        score_avant_plafond = score
-        score = int(round(score * mult))
-        if mult < 1.0 and score < score_avant_plafond and oos_pf != PF_SENTINELLE_AUCUNE_PERTE:
-            warnings.append({
-                "level": "warning",
-                "message": f"Marge de profit limitée : le Profit Factor sur les périodes de test ({oos_pf:.2f}) reste proche de 1 (le seuil de rentabilité) — le score est plafonné même si la stratégie reste par ailleurs stable."
-            })
 
     return {
         "score": int(score),
@@ -1926,6 +1872,125 @@ def calculer_score_qualite(oos_profit_factor, ratios_performance):
         "score_sharpe": round(score_sharpe, 1) if score_sharpe is not None else None,
         "score_calmar": round(score_calmar, 1) if score_calmar is not None else None,
         "oos_profit_factor_utilise": round(oos_profit_factor, 2),
+    }
+
+
+# ============================================================
+# SCORE DE RISQUE — TROISIÈME DIAGNOSTIC, DISTINCT DE ROBUSTESSE ET QUALITÉ
+#
+# La Robustesse répond à "ce résultat tient-il d'une fenêtre à l'autre".
+# La Qualité répond à "ce résultat est-il bon dans l'absolu". Le Risque
+# répond à une troisième question, différente des deux : "peu importe si
+# c'est robuste et rentable, à quel point le pire scénario réaliste
+# fait-il mal ?" Cinq axes, tous déjà calculés ailleurs dans le moteur
+# mais jusqu'ici seulement utilisés comme alertes diagnostiques, jamais
+# transformés en score :
+#   - Max Drawdown en valeur absolue (le vrai creux si saisi manuellement,
+#     sinon celui calculé à partir des trades clôturés)
+#   - Facteur de récupération (déménagé du pilier Monte Carlo -- "le
+#     gain justifie-t-il l'ampleur du pire drawdown simulé")
+#   - Signaux de risque de ruine (payoff, escalade des pertes, queue de
+#     distribution, escalade de volume)
+#   - Viabilité sous stress de coûts (la stratégie reste-t-elle rentable
+#     si les frais/slippage étaient plus élevés)
+#   - Série de pertes consécutives en valeur absolue (pas limitée à une
+#     seule fenêtre walk-forward, contrairement au Pilier 3 de Robustesse)
+# ============================================================
+
+POIDS_RISQUE_MDD = 25
+POIDS_RISQUE_RECOVERY = 25
+POIDS_RISQUE_SIGNAUX_RUINE = 25
+POIDS_RISQUE_COUTS = 15
+POIDS_RISQUE_SERIE_PERTES = 10
+
+
+def calculer_score_risque(mdd_pct, mdd_source, stress_recovery_factor, risque_ruine_res, costs_res, max_pertes_consecutives_absolu):
+    """Score 0-100 distinct, jamais mélangé aux deux autres diagnostics."""
+    avertissements = []
+
+    # Axe 1 : Max Drawdown en % -- privilégie le vrai chiffre saisi
+    # manuellement (inclut les positions encore ouvertes) sur celui
+    # calculé à partir des seuls trades clôturés.
+    if mdd_pct is not None:
+        if mdd_pct <= 10:
+            score_mdd = float(POIDS_RISQUE_MDD)
+        elif mdd_pct <= 20:
+            score_mdd = POIDS_RISQUE_MDD - (mdd_pct - 10) / 10 * (POIDS_RISQUE_MDD - 15)
+        elif mdd_pct <= 35:
+            score_mdd = 15 - (mdd_pct - 20) / 15 * 15
+        else:
+            score_mdd = 0.0
+    else:
+        score_mdd = None
+
+    # Axe 2 : facteur de récupération (profit / pire drawdown simulé à 95%)
+    if stress_recovery_factor is not None:
+        score_recovery = _score_par_paliers(stress_recovery_factor, [
+            (0.0, 0), (1.0, 12), (RECOVERY_FACTOR_CIBLE, POIDS_RISQUE_RECOVERY),
+        ])
+    else:
+        score_recovery = None
+
+    # Axe 3 : signaux de risque de ruine -- chaque signal actif retire des
+    # points, jusqu'à épuiser le budget de cet axe.
+    n_signaux = sum([
+        bool(risque_ruine_res.get("signal_payoff")),
+        bool(risque_ruine_res.get("signal_escalade")),
+        bool(risque_ruine_res.get("signal_queue")),
+        bool(risque_ruine_res.get("signal_volume")),
+    ])
+    score_signaux = max(0.0, POIDS_RISQUE_SIGNAUX_RUINE - n_signaux * (POIDS_RISQUE_SIGNAUX_RUINE / 3))
+    if n_signaux > 0:
+        avertissements.append(f"{n_signaux} signal(aux) de gestion du risque actif(s) sur cette analyse.")
+
+    # Axe 4 : viabilité sous stress de coûts -- utilise les scénarios déjà
+    # calculés (0.5x/1x/1.5x/2x) pour un score gradué plutôt qu'un simple
+    # viable/non-viable au seul scénario 1x.
+    scenarios = costs_res.get("cost_scenarios") or []
+    if scenarios:
+        n_viables = sum(1 for s in scenarios if s.get("rentable"))
+        score_couts = (n_viables / len(scenarios)) * POIDS_RISQUE_COUTS
+    else:
+        score_couts = None
+
+    # Axe 5 : série de pertes consécutives en valeur absolue (sur
+    # l'historique de test complet, pas limitée à une fenêtre).
+    if max_pertes_consecutives_absolu is not None:
+        if max_pertes_consecutives_absolu >= 15:
+            score_serie = 0.0
+        elif max_pertes_consecutives_absolu >= 5:
+            score_serie = POIDS_RISQUE_SERIE_PERTES - (max_pertes_consecutives_absolu - 5) / 10 * POIDS_RISQUE_SERIE_PERTES
+        else:
+            score_serie = float(POIDS_RISQUE_SERIE_PERTES)
+    else:
+        score_serie = None
+
+    composantes = [
+        ("mdd", score_mdd, POIDS_RISQUE_MDD),
+        ("recovery", score_recovery, POIDS_RISQUE_RECOVERY),
+        ("signaux_ruine", score_signaux, POIDS_RISQUE_SIGNAUX_RUINE),
+        ("couts", score_couts, POIDS_RISQUE_COUTS),
+        ("serie_pertes", score_serie, POIDS_RISQUE_SERIE_PERTES),
+    ]
+    composantes_actives = [(nom, s, poids) for nom, s, poids in composantes if s is not None]
+    if not composantes_actives:
+        return None
+
+    poids_total = sum(poids for _, _, poids in composantes_actives)
+    score_brut = sum(s for _, s, _ in composantes_actives)
+    score_final = max(0, min(100, int(round(score_brut / poids_total * 100))))
+
+    return {
+        "score": score_final,
+        "score_mdd": round(score_mdd, 1) if score_mdd is not None else None,
+        "score_recovery": round(score_recovery, 1) if score_recovery is not None else None,
+        "score_signaux_ruine": round(score_signaux, 1),
+        "score_couts": round(score_couts, 1) if score_couts is not None else None,
+        "score_serie_pertes": round(score_serie, 1) if score_serie is not None else None,
+        "n_signaux_ruine_actifs": n_signaux,
+        "mdd_utilise_pct": round(mdd_pct, 2) if mdd_pct is not None else None,
+        "mdd_source": mdd_source,
+        "avertissements": avertissements,
     }
 
 
@@ -3344,6 +3409,37 @@ def construire_resultat_analyse(
     mult_risque_ruine = 1.0
     score_global = score_global_brut
 
+    # 4bis-2. Qualité, Risque et score combiné -- trois diagnostics
+    # distincts, jamais mélangés entre eux dans l'affichage principal.
+    # Le score combiné n'existe qu'en repli, calculé par moyenne
+    # géométrique (pas arithmétique) : un score bas sur un seul axe tire
+    # le combiné vers le bas de façon disproportionnée plutôt que d'être
+    # dilué par une moyenne classique -- une Robustesse de 90 et une
+    # Qualité de 15 ne doivent pas donner l'impression rassurante d'un
+    # "52 correct", puisque la Robustesse basse signifie précisément
+    # qu'on ne peut pas faire confiance au chiffre de Qualité.
+    qualite_perf_res = calculer_score_qualite(oos_pf, ratios_performance)
+    risque_res = calculer_score_risque(
+        max_equity_drawdown_pct if max_equity_drawdown_pct is not None else stats_oos["mdd_pct"],
+        "manuel" if max_equity_drawdown_pct is not None else "calcule",
+        mc_res["stress_recovery_factor"],
+        risque_ruine_res,
+        costs_res,
+        stats_oos["max_pertes_consecutives"],
+    )
+    scores_disponibles = [score_global]
+    if qualite_perf_res is not None:
+        scores_disponibles.append(qualite_perf_res["score"])
+    if risque_res is not None:
+        scores_disponibles.append(risque_res["score"])
+    if any(s <= 0 for s in scores_disponibles):
+        score_combine_res = 0
+    else:
+        produit = 1.0
+        for s in scores_disponibles:
+            produit *= s
+        score_combine_res = int(round(produit ** (1 / len(scores_disponibles))))
+
     # 4ter. Fiabilité de l'évaluation : information séparée du score. Un
     # échantillon limité réduit la portée interprétative du résultat, mais
     # ne modifie pas artificiellement le score de robustesse.
@@ -3502,7 +3598,9 @@ def construire_resultat_analyse(
             "couts_reels_payes": round(couts_reels_payes, 2) if couts_reels_payes is not None else None,
         },
         "ratios_performance": ratios_performance,
-        "qualite_performance": calculer_score_qualite(oos_pf, ratios_performance),
+        "qualite_performance": qualite_perf_res,
+        "risque": risque_res,
+        "score_combine_geometrique": score_combine_res,
         "global": {
             "profit_net": round(profit_global, 2),
             "mdd": round(mdd_global, 2),
@@ -3567,7 +3665,6 @@ def construire_resultat_analyse(
             "path_sensitivity_ratio": mc_res["path_sensitivity_ratio"],
             "stress_recovery_factor": mc_res["stress_recovery_factor"],
             "score_path": mc_res["score_path"],
-            "score_recovery": mc_res["score_recovery"]
         },
         "stress_pro_bootstrap": fragilite_res,
         "stress_pro_costs": costs_res,
