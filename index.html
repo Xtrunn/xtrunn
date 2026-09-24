@@ -1794,6 +1794,13 @@
                 </svg>
                 <span>Qualité <span class="val" id="orbitScoreValQualite">--</span>/100</span>
             </div>
+            <div class="orbit-score-mini" id="orbitScoreMiniRisque" style="display:none;">
+                <svg class="orbit-ring-mini" viewBox="0 0 30 30">
+                    <circle cx="15" cy="15" r="12" fill="none" stroke="var(--ash)" stroke-width="3"></circle>
+                    <circle id="orbitRingMiniArcRisque" cx="15" cy="15" r="12" fill="none" stroke="var(--horizon)" stroke-width="3" stroke-linecap="round" stroke-dasharray="75.4" stroke-dashoffset="75.4" transform="rotate(-90 15 15)"></circle>
+                </svg>
+                <span>Risque <span class="val" id="orbitScoreValRisque">--</span>/100</span>
+            </div>
         </div>
 
         <button class="parametres-btn" id="parametresBtn" onclick="ouvrirParametres()" title="Paramètres">
@@ -2243,10 +2250,9 @@
                         <div class="pillar-header-badge">P2</div>
                         <div class="pillar-header-info">
                             <div class="pillar-header-title">Sensibilité de Trajectoire <span class="pillar-header-score" id="p1ScoreDisplay">-- / 30</span></div>
-                            <p class="pillar-header-desc">Réordonner des trades ne change jamais leur somme — seul le chemin parcouru (et donc le drawdown) varie. Ce pilier note la stratégie sur deux questions : le drawdown réel a-t-il eu de la "chance" dans son enchaînement (15 pts), et le profit couvre-t-il le pire drawdown simulé (15 pts) ?</p>
+                            <p class="pillar-header-desc">Réordonner des trades ne change jamais leur somme — seul le chemin parcouru (et donc le drawdown) varie. Ce pilier note uniquement si le drawdown réel a eu de la "chance" dans son enchînement. Le facteur de récupération (le profit justifie-t-il l'ampleur du risque) est noté séparément, dans le diagnostic Risque.</p>
                             <div class="pillar-header-metrics">
-                                <div><span>Score Sensibilité</span><b id="p1ScorePath">-- / 15</b></div>
-                                <div><span>Score Récupération</span><b id="p1ScoreRecovery">-- / 15</b></div>
+                                <div><span>Score Sensibilité</span><b id="p1ScorePath">-- / 30</b></div>
                             </div>
                         </div>
                     </div>
@@ -2613,6 +2619,42 @@
                         <p style="font-size:0.68rem; color:var(--text-muted); margin:10px 0 0; text-align:center;">
                             Le rapport texte est pensé pour être collé directement dans une IA ou partagé à un humain qui débogue le code. Besoin d'aller plus loin ? <span id="btnExportTradesAnnotes" style="text-decoration:underline; cursor:pointer;" onclick="exporterTradesAnnotes()">Exporter les trades annotés (CSV)</span>.
                         </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel" id="panneauQualiteRisque" style="display:none;">
+                <div class="panel-title">Qualité, Risque & Score Combiné</div>
+                <p style="font-size:0.78rem; color:var(--text-muted); margin:8px 0 16px; line-height:1.5;">
+                    Deux diagnostics distincts de la Robustesse ci-dessus, jamais mélangés avec elle. La Qualité répond à "si ce backtest se reproduit, est-ce que ça vaut la peine d'être tradé ?". Le Risque répond à "peu importe si c'est robuste et rentable, à quel point le pire scénario réaliste fait-il mal ?"
+                </p>
+                <div class="metric-row-4">
+                    <div class="mc-info-card">
+                        <div class="mc-info-title">Qualité / Performance</div>
+                        <div class="mc-info-val" id="diagScoreQualite">--</div>
+                    </div>
+                    <div class="mc-info-card">
+                        <div class="mc-info-title">Risque</div>
+                        <div class="mc-info-val" id="diagScoreRisque">--</div>
+                    </div>
+                    <div class="mc-info-card">
+                        <div class="mc-info-title">Score Combiné <span class="info-tip" data-tip="Moyenne géométrique des scores disponibles, pas une moyenne classique : un score bas sur un seul axe tire ce chiffre vers le bas de façon disproportionnée plutôt que d'être dilué. Un repère secondaire seulement -- les scores ci-dessus restent la référence.">?</span></div>
+                        <div class="mc-info-val" id="diagScoreCombine">--</div>
+                    </div>
+                    <div class="mc-info-card">
+                        <div class="mc-info-title">&nbsp;</div>
+                        <div class="mc-info-val">&nbsp;</div>
+                    </div>
+                </div>
+
+                <div class="collapsible" style="margin-top:16px;">
+                    <button class="collapsible-header" onclick="toggleCollapsible(this)">
+                        <span>Détail du score de Risque</span>
+                        <span class="collapsible-chevron">▾</span>
+                    </button>
+                    <div class="collapsible-content">
+                        <div class="stats-detail-grid" id="diagRisqueDetailGrid"></div>
+                        <p id="diagRisqueMddSourceTxt" style="font-size:0.72rem; color:var(--text-muted); margin:12px 0 0;"></p>
                     </div>
                 </div>
             </div>
@@ -3767,7 +3809,7 @@
                 recEl.className = "mc-info-val " + (mc.stress_recovery_factor >= 3.0 ? "positive" : (mc.stress_recovery_factor <= 0 ? "negative" : "warning"));
             }
 
-            document.getElementById('mcScore').textContent = (mc.score_path + mc.score_recovery) + " / 30";
+            document.getElementById('mcScore').textContent = mc.score_path + " / 30";
 
             // 3. Stress Pro
             const bp = data.stress_pro_bootstrap;
@@ -3812,6 +3854,45 @@
                 mettreAJourAnneauScoreQualite(qualite.score);
             } else {
                 miniQualite.style.display = 'none';
+            }
+
+            const risqueScore = data.risque;
+            const miniRisque = document.getElementById('orbitScoreMiniRisque');
+            if (risqueScore) {
+                miniRisque.style.display = 'flex';
+                mettreAJourAnneauScoreRisque(risqueScore.score);
+            } else {
+                miniRisque.style.display = 'none';
+            }
+
+            const panneauQR = document.getElementById('panneauQualiteRisque');
+            if (qualite || risqueScore) {
+                panneauQR.style.display = 'block';
+                document.getElementById('diagScoreQualite').textContent = qualite ? `${qualite.score}/100` : 'N/D';
+                document.getElementById('diagScoreRisque').textContent = risqueScore ? `${risqueScore.score}/100` : 'N/D';
+                document.getElementById('diagScoreCombine').textContent = (data.score_combine_geometrique !== null && data.score_combine_geometrique !== undefined) ? `${data.score_combine_geometrique}/100` : 'N/D';
+
+                if (risqueScore) {
+                    const cartes = [
+                        ['Max Drawdown', risqueScore.score_mdd !== null ? `${risqueScore.score_mdd}/25` : 'N/D'],
+                        ['Facteur de Récupération', risqueScore.score_recovery !== null ? `${risqueScore.score_recovery}/25` : 'N/D'],
+                        ['Signaux de Risque de Ruine', `${risqueScore.score_signaux_ruine}/25`],
+                        ['Viabilité sous Stress de Coûts', risqueScore.score_couts !== null ? `${risqueScore.score_couts}/15` : 'N/D'],
+                        ['Série de Pertes Consécutives', risqueScore.score_serie_pertes !== null ? `${risqueScore.score_serie_pertes}/10` : 'N/D'],
+                    ];
+                    document.getElementById('diagRisqueDetailGrid').innerHTML = cartes.map(([titre, val]) =>
+                        `<div class="kpi-card"><div class="kpi-label">${titre}</div><div class="kpi-value">${val}</div></div>`
+                    ).join('');
+                    const sourceTxt = risqueScore.mdd_source === 'manuel'
+                        ? `Max Drawdown utilisé pour ce diagnostic : celui que vous avez saisi (${risqueScore.mdd_utilise_pct}%).`
+                        : `Max Drawdown utilisé pour ce diagnostic : celui estimé par XTRUNN à partir des trades clôturés (${risqueScore.mdd_utilise_pct}%) — saisissez le vrai Max Equity Drawdown dans les Réglages Complémentaires pour plus de précision.`;
+                    document.getElementById('diagRisqueMddSourceTxt').textContent = sourceTxt;
+                } else {
+                    document.getElementById('diagRisqueDetailGrid').innerHTML = '';
+                    document.getElementById('diagRisqueMddSourceTxt').textContent = '';
+                }
+            } else {
+                panneauQR.style.display = 'none';
             }
 
             // Mode Validation masqué pour la v1 -- la bannière ne doit
@@ -6410,6 +6491,16 @@
             document.getElementById('orbitScoreValQualite').textContent = score;
         }
 
+        function mettreAJourAnneauScoreRisque(score) {
+            const pct = Math.max(0, Math.min(100, score)) / 100;
+            const miniArc = document.getElementById('orbitRingMiniArcRisque');
+            const miniCirc = 2 * Math.PI * 12;
+            miniArc.setAttribute('stroke-dasharray', miniCirc);
+            miniArc.setAttribute('stroke-dashoffset', miniCirc * (1 - pct));
+            miniArc.style.stroke = score >= 70 ? 'var(--horizon)' : (score >= 40 ? 'var(--warning)' : 'var(--danger)');
+            document.getElementById('orbitScoreValRisque').textContent = score;
+        }
+
         // ============================================================
         // CHAMP D'ÉTOILES AMBIANT — décor fixe en fond de page. Étoiles
         // statiques avec un léger scintillement CSS-friendly (opacité
@@ -8156,7 +8247,7 @@ Ratio de stabilité médian : ${rob.stability_ratio}
 Profit Factor Test (toutes fenêtres) : ${rob.oos_profit_factor}
 Fenêtres faibles (< 0.5) : ${rob.fenetres_faibles_pct}%
 
---- PILIER 2 — SENSIBILITÉ DE TRAJECTOIRE / MONTE CARLO (${mc.score_path + mc.score_recovery} / 30) ---
+--- PILIER 2 — SENSIBILITÉ DE TRAJECTOIRE / MONTE CARLO (${mc.score_path} / 30) ---
 ${interpreterMonteCarlo(mc.stress_recovery_factor, mc.path_sensitivity_ratio)}
 Pire Max DD simulé (95%) : -${Math.abs(mc.pire_mdd_95).toFixed(2)} ${d}
 Sensibilité du drawdown : ${mc.path_sensitivity_ratio !== null ? mc.path_sensitivity_ratio.toFixed(2) + 'x' : 'N/A'}
