@@ -2079,6 +2079,29 @@
                 </div>
             </div>
 
+            <div class="collapsible open" id="panneauVentilationInstruments" style="display:none;">
+                <button class="collapsible-header" onclick="toggleCollapsible(this)">
+                    <span>Ventilation par Instrument</span>
+                    <span class="collapsible-chevron">▾</span>
+                </button>
+                <div class="collapsible-content">
+                    <p style="font-size:0.78rem; color:var(--text-muted); margin:0 0 16px; line-height:1.5;">
+                        Purement informatif -- ne trader qu'un seul instrument n'est pas un défaut en soi. L'intérêt est de voir, si plusieurs instruments sont tradés, si la performance est vraiment répartie ou repose en réalité sur un seul symbole.
+                    </p>
+                    <table style="width:100%; border-collapse:collapse; font-size:0.82rem;">
+                        <thead>
+                            <tr style="border-bottom:1px solid var(--ash); text-align:left;">
+                                <th style="padding:8px 10px; color:var(--text-muted); font-weight:500;">Instrument</th>
+                                <th style="padding:8px 10px; color:var(--text-muted); font-weight:500;">Trades</th>
+                                <th style="padding:8px 10px; color:var(--text-muted); font-weight:500;">Profit Net</th>
+                                <th style="padding:8px 10px; color:var(--text-muted); font-weight:500;">% du Profit Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ventilationInstrumentsCorps"></tbody>
+                    </table>
+                </div>
+            </div>
+
             <div class="collapsible open">
                 <button class="collapsible-header" onclick="toggleCollapsible(this)">
                     <span>Courbe d'Équité Complète</span>
@@ -3779,6 +3802,22 @@
                 }
             } else {
                 panneauRatios.style.display = 'none';
+            }
+
+            const panneauVentil = document.getElementById('panneauVentilationInstruments');
+            const ventil = data.ventilation_instruments;
+            if (ventil && ventil.n_instruments > 0) {
+                panneauVentil.style.display = 'block';
+                document.getElementById('ventilationInstrumentsCorps').innerHTML = ventil.ventilation.map(v => `
+                    <tr style="border-bottom:1px solid var(--ash);">
+                        <td style="padding:8px 10px;">${v.symbole}</td>
+                        <td style="padding:8px 10px;">${v.n_trades}</td>
+                        <td style="padding:8px 10px;" class="${v.profit_total >= 0 ? 'positive' : 'negative'}">${v.profit_total} ${deviseSymbole}</td>
+                        <td style="padding:8px 10px;">${v.pct_profit_total} %</td>
+                    </tr>
+                `).join('');
+            } else {
+                panneauVentil.style.display = 'none';
             }
 
             const periodeEl = document.getElementById('globalPeriodeTxt');
