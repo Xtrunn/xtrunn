@@ -3867,18 +3867,25 @@
 
                 if (risqueScore) {
                     const cartes = [
-                        ['Max Drawdown', risqueScore.score_mdd !== null ? `${risqueScore.score_mdd}/25` : 'N/D'],
-                        ['Facteur de Récupération', risqueScore.score_recovery !== null ? `${risqueScore.score_recovery}/25` : 'N/D'],
-                        ['Signaux de Risque de Ruine', `${risqueScore.score_signaux_ruine}/25`],
+                        ['Max Drawdown', risqueScore.score_mdd !== null ? `${risqueScore.score_mdd}/20` : 'N/D'],
+                        ['Facteur de Récupération', risqueScore.score_recovery !== null ? `${risqueScore.score_recovery}/20` : 'N/D'],
+                        ['Signaux de Risque de Ruine', `${risqueScore.score_signaux_ruine}/20`],
                         ['Viabilité sous Stress de Coûts', risqueScore.score_couts !== null ? `${risqueScore.score_couts}/15` : 'N/D'],
                         ['Série de Pertes Consécutives', risqueScore.score_serie_pertes !== null ? `${risqueScore.score_serie_pertes}/10` : 'N/D'],
+                        ['Durée du Drawdown', risqueScore.score_duree_dd !== null ? `${risqueScore.score_duree_dd}/15` : 'N/D'],
                     ];
                     document.getElementById('diagRisqueDetailGrid').innerHTML = cartes.map(([titre, val]) =>
                         `<div class="kpi-card"><div class="kpi-label">${titre}</div><div class="kpi-value">${val}</div></div>`
                     ).join('');
-                    const sourceTxt = risqueScore.mdd_source === 'manuel'
+                    let sourceTxt = risqueScore.mdd_source === 'manuel'
                         ? `Max Drawdown utilisé pour ce diagnostic : celui que vous avez saisi (${risqueScore.mdd_utilise_pct}%).`
                         : `Max Drawdown utilisé pour ce diagnostic : celui estimé par XTRUNN à partir des trades clôturés (${risqueScore.mdd_utilise_pct}%) — saisissez le vrai Max Equity Drawdown dans les Réglages Complémentaires pour plus de précision.`;
+                    if (risqueScore.duree_dd_jours !== null && risqueScore.duree_dd_jours !== undefined) {
+                        sourceTxt += ` Plus long temps sous l'eau observé : ${risqueScore.duree_dd_jours} jours.`;
+                        if (risqueScore.duree_dd_toujours_en_cours) {
+                            sourceTxt += ` Ce temps sous l'eau n'était pas encore terminé à la fin de l'historique testé — le vrai pire cas pourrait être plus long.`;
+                        }
+                    }
                     document.getElementById('diagRisqueMddSourceTxt').textContent = sourceTxt;
                 } else {
                     document.getElementById('diagRisqueDetailGrid').innerHTML = '';
