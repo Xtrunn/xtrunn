@@ -2672,6 +2672,17 @@
 
                 <div class="collapsible" style="margin-top:16px;">
                     <button class="collapsible-header" onclick="toggleCollapsible(this)">
+                        <span>Détail du score de Qualité</span>
+                        <span class="collapsible-chevron">▾</span>
+                    </button>
+                    <div class="collapsible-content">
+                        <div class="stats-detail-grid" id="diagQualiteDetailGrid"></div>
+                        <p id="diagQualitePfAlerteTxt" style="display:none; font-size:0.78rem; color:var(--warning); margin:14px 0 0; padding:10px 12px; background:rgba(201,166,99,0.08); border:1px solid rgba(201,166,99,0.25); border-radius:8px;"></p>
+                    </div>
+                </div>
+
+                <div class="collapsible" style="margin-top:16px;">
+                    <button class="collapsible-header" onclick="toggleCollapsible(this)">
                         <span>Détail du score de Risque</span>
                         <span class="collapsible-chevron">▾</span>
                     </button>
@@ -3920,6 +3931,27 @@
                 document.getElementById('diagScoreQualite').textContent = qualite ? `${qualite.score}/100` : 'N/D';
                 document.getElementById('diagScoreRisque').textContent = risqueScore ? `${risqueScore.score}/100` : 'N/D';
                 document.getElementById('diagScoreCombine').textContent = (data.score_combine_geometrique !== null && data.score_combine_geometrique !== undefined) ? `${data.score_combine_geometrique}/100` : 'N/D';
+
+                if (qualite) {
+                    const cartesQ = [
+                        ['Profit Factor', `${qualite.score_profit_factor}/40`],
+                        ['Sharpe Ratio', qualite.score_sharpe !== null ? `${qualite.score_sharpe}/30` : 'N/D'],
+                        ['Calmar Ratio', qualite.score_calmar !== null ? `${qualite.score_calmar}/30` : 'N/D'],
+                    ];
+                    document.getElementById('diagQualiteDetailGrid').innerHTML = cartesQ.map(([titre, val]) =>
+                        `<div class="kpi-card"><div class="kpi-label">${titre}</div><div class="kpi-value">${val}</div></div>`
+                    ).join('');
+                    const alerteTxt = document.getElementById('diagQualitePfAlerteTxt');
+                    if (qualite.pf_suspicieusement_eleve) {
+                        alerteTxt.style.display = 'block';
+                        alerteTxt.textContent = `Profit Factor inhabituellement élevé (${qualite.oos_profit_factor_utilise}) : au-delà de ce niveau, plusieurs sources spécialisées considèrent qu'un Profit Factor aussi élevé est lui-même un signal à vérifier (surapprentissage probable ou échantillon trop petit), plutôt qu'un signe de qualité supplémentaire. Le score de Qualité ne baisse pas pour cette seule raison -- c'est le rôle du diagnostic de Robustesse -- mais ce chiffre mérite d'être confirmé sur un historique plus long.`;
+                    } else {
+                        alerteTxt.style.display = 'none';
+                    }
+                } else {
+                    document.getElementById('diagQualiteDetailGrid').innerHTML = '';
+                    document.getElementById('diagQualitePfAlerteTxt').style.display = 'none';
+                }
 
                 if (risqueScore) {
                     const cartes = [
