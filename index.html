@@ -2711,6 +2711,16 @@
                             <div class="mc-info-val" id="ruineQueue">--</div>
                         </div>
                     </div>
+                    <div class="metric-row-4" style="grid-template-columns: 1fr 1fr; margin-top:12px;">
+                        <div class="mc-info-card">
+                            <div class="mc-info-title">Asymétrie de la Distribution <span class="info-tip" data-tip="Mesure la forme de toute la distribution des trades, pas juste la plus grosse perte isolée. Une asymétrie très négative (≤ -1) signifie que les pertes extrêmes tirent statistiquement la distribution vers le bas de façon disproportionnée.">?</span></div>
+                            <div class="mc-info-val" id="ruineSkew">--</div>
+                        </div>
+                        <div class="mc-info-card">
+                            <div class="mc-info-title">Aplatissement en Excès <span class="info-tip" data-tip="Au-delà de 3, les valeurs extrêmes (bonnes ou mauvaises) sont statistiquement plus fréquentes que pour une distribution normale équilibrée -- combiné à une asymétrie négative, un profil à surveiller.">?</span></div>
+                            <div class="mc-info-val" id="ruineKurtosis">--</div>
+                        </div>
+                    </div>
                     <div id="ruineVolumeSection" style="display:none; margin-top:16px;">
                         <div class="metric-row-4" style="grid-template-columns: 1fr 1fr;">
                             <div class="mc-info-card">
@@ -3960,6 +3970,10 @@
             document.getElementById('ruineEscalade').className = 'mc-info-val ' + (rob.ruine_pct_escalade >= 50 ? 'negative' : '');
             document.getElementById('ruineQueue').textContent = (rob.ruine_ratio_queue !== null && rob.ruine_ratio_queue !== undefined) ? rob.ruine_ratio_queue + 'x' : 'N/A';
             document.getElementById('ruineQueue').className = 'mc-info-val ' + (rob.ruine_ratio_queue !== null && rob.ruine_ratio_queue >= 6 ? 'warning' : '');
+            document.getElementById('ruineSkew').textContent = (rob.ruine_skew !== null && rob.ruine_skew !== undefined) ? rob.ruine_skew : 'N/A';
+            document.getElementById('ruineSkew').className = 'mc-info-val ' + (rob.ruine_signal_distribution ? 'warning' : '');
+            document.getElementById('ruineKurtosis').textContent = (rob.ruine_kurtosis_exces !== null && rob.ruine_kurtosis_exces !== undefined) ? rob.ruine_kurtosis_exces : 'N/A';
+            document.getElementById('ruineKurtosis').className = 'mc-info-val ' + (rob.ruine_signal_distribution ? 'warning' : '');
 
             const ruineVolumeSection = document.getElementById('ruineVolumeSection');
             if (rob.ruine_cohesion_volume) {
