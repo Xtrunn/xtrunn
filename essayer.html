@@ -8443,9 +8443,11 @@ ${data.qualite_performance ? `
 
 === SCORE DE QUALITÉ / PERFORMANCE (${data.qualite_performance.score} / 100) ===
 Diagnostic distinct de la Robustesse : répond à "si ce backtest se reproduit, est-ce que ça vaut la peine d'être tradé ?"
-Profit Factor : ${data.qualite_performance.score_profit_factor} / 40
-Sharpe Ratio : ${data.qualite_performance.score_sharpe ?? 'N/D'} / 30
-Calmar Ratio : ${data.qualite_performance.score_calmar ?? 'N/D'} / 30
+Profit Factor : ${data.qualite_performance.score_profit_factor} / 25
+Sharpe Ratio : ${data.qualite_performance.score_sharpe ?? 'N/D'} / 20
+Sortino Ratio : ${data.qualite_performance.score_sortino ?? 'N/D'} / 20
+Calmar Ratio : ${data.qualite_performance.score_calmar ?? 'N/D'} / 20
+Vs Benchmark : ${data.qualite_performance.score_benchmark ?? 'N/D (non renseigné)'} / 15
 
 --- ALERTES DE SANTÉ — QUALITÉ ---
 ${alertesQualiteTxt}
@@ -8594,7 +8596,7 @@ Score Combiné (repère secondaire, moyenne géométrique des scores disponibles
                 <div class="pr-kpi-grid">
                     <div class="pr-kpi"><div class="pr-kpi-label">Fenêtres Walk-Forward</div><div class="pr-kpi-val">${derniereAnalyse.walkforward.n_windows}</div></div>
                     <div class="pr-kpi"><div class="pr-kpi-label">Stabilité Médiane</div><div class="pr-kpi-val">${rob.stability_ratio}</div></div>
-                    <div class="pr-kpi"><div class="pr-kpi-label">Score Brut (avant biais)</div><div class="pr-kpi-val">${rob.score_global_brut} / 100</div></div>
+                    <div class="pr-kpi"><div class="pr-kpi-label">Échantillon Test</div><div class="pr-kpi-val">${rob.n_trades_oos} trades</div></div>
                     <div class="pr-kpi"><div class="pr-kpi-label">Variantes Déclarées</div><div class="pr-kpi-val">${(rob.n_trials_testes !== null && rob.n_trials_testes !== undefined) ? rob.n_trials_testes : 'Non renseigné'}</div></div>
                 </div>
 
@@ -8634,9 +8636,11 @@ Score Combiné (repère secondaire, moyenne géométrique des scores disponibles
                 </div>
                 <table class="pr-pillars">
                     <tr><th>Axe</th><th>Score</th></tr>
-                    <tr><td>Profit Factor</td><td>${qualiteD.score_profit_factor} / 40</td></tr>
-                    <tr><td>Sharpe Ratio</td><td>${qualiteD.score_sharpe ?? 'N/D'} / 30</td></tr>
-                    <tr><td>Calmar Ratio</td><td>${qualiteD.score_calmar ?? 'N/D'} / 30</td></tr>
+                    <tr><td>Profit Factor</td><td>${qualiteD.score_profit_factor} / 25</td></tr>
+                    <tr><td>Sharpe Ratio</td><td>${qualiteD.score_sharpe ?? 'N/D'} / 20</td></tr>
+                    <tr><td>Sortino Ratio</td><td>${qualiteD.score_sortino ?? 'N/D'} / 20</td></tr>
+                    <tr><td>Calmar Ratio</td><td>${qualiteD.score_calmar ?? 'N/D'} / 20</td></tr>
+                    <tr><td>Vs Benchmark</td><td>${qualiteD.score_benchmark ?? 'N/D (non renseigné)'} / 15</td></tr>
                 </table>
                 <div class="pr-section-title">Alertes de Santé — Qualité</div>
                 ${alertesQualiteHtml}
