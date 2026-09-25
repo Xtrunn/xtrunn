@@ -1628,6 +1628,14 @@
             font-size: 0.6rem; font-weight: 600; cursor: help;
             margin-left: 5px; position: relative; vertical-align: middle;
         }
+        .diag-tag {
+            display: inline-block; font-size: 0.6rem; font-weight: 700;
+            letter-spacing: 0.5px; padding: 2px 8px; border-radius: 10px;
+            margin-right: 8px; vertical-align: middle;
+        }
+        .diag-tag-robustesse { background: rgba(201,166,99,0.15); color: var(--horizon); }
+        .diag-tag-risque { background: rgba(201,106,99,0.15); color: #d97f78; }
+        .diag-tag-general { background: var(--ash-bright); color: var(--text-muted); }
         /* Infobulle globale -- un seul élément partagé, positionné par
            JS en `position: fixed` et rendu tout à la fin du <body>. Ça
            échappe complètement aux contextes d'empilement et aux zones
@@ -2564,6 +2572,20 @@
                 </div>
             </div>
             <div class="panel">
+                <div class="panel-title">Rapport d'Audit Complet</div>
+                <p style="font-size:0.78rem; color:var(--text-muted); margin:8px 0 16px; line-height:1.5;">
+                    Couvre les trois diagnostics ci-dessous (Robustesse, Qualité, Risque), leurs alertes et leurs recommandations.
+                </p>
+                <div style="display:flex; gap:8px;">
+                    <button class="btn-analyser" id="btnExportPdf" style="flex:1; background:transparent; color:var(--silver-bright); border:1px solid var(--border-silver);" onclick="genererRapportPDF()" disabled>Exporter le Rapport d'Audit (PDF)</button>
+                    <button class="btn-analyser" id="btnCopierRapport" style="flex:1; background:transparent; color:var(--silver-bright); border:1px solid var(--border-silver);" onclick="copierRapportTexte()" disabled>Copier le Rapport (texte)</button>
+                </div>
+                <p style="font-size:0.68rem; color:var(--text-muted); margin:10px 0 0; text-align:center;">
+                    Le rapport texte est pensé pour être collé directement dans une IA ou partagé à un humain qui débogue le code. Besoin d'aller plus loin ? <span id="btnExportTradesAnnotes" style="text-decoration:underline; cursor:pointer;" onclick="exporterTradesAnnotes()">Exporter les trades annotés (CSV)</span>.
+                </p>
+            </div>
+
+            <div class="panel">
                 <div class="panel-title">Diagnostic & Score de Robustesse</div>
                 <div class="diag-grid">
                     <div class="score-box">
@@ -2592,29 +2614,10 @@
                             </button>
                             <div class="collapsible-content" style="padding:0 16px;">
                                 <div id="scoreFourchette" style="font-size:0.72rem; color:var(--text-muted); margin-top:4px; padding-top:4px;">Fourchette estimée (bootstrap) : -- / --</div>
-                                <div class="score-chain" id="scoreChainBox" style="margin-top:12px;">
-                                    <div class="score-chain-row">
-                                        <span class="label">4 Piliers (brut) <span class="info-tip" data-tip="Somme des scores des piliers 1 à 4, avant tout ajustement.">?</span></span>
-                                        <span class="val" id="chainBrut">-- / 100</span>
-                                    </div>
-                                    <div class="score-chain-row op">×</div>
-                                    <div class="score-chain-row">
-                                        <span class="label">Risque de Ruine <span class="info-tip" data-tip="Signaux de money management dangereux détectés objectivement dans la séquence de trades — voir le panneau dédié plus bas.">?</span></span>
-                                        <span class="val" id="chainRuine">--</span>
-                                    </div>
-                                    <div class="score-chain-row op" id="chainCapOp" style="display:none;">↓</div>
-                                    <div class="score-chain-row" id="chainCapRow" style="display:none;">
-                                        <span class="label">Plafond Échantillon Faible <span class="info-tip" data-tip="Moins de 30 trades de Test : le score est plafonné à 50, quel que soit le résultat des étapes précédentes.">?</span></span>
-                                        <span class="val" id="chainCap">--</span>
-                                    </div>
-                                    <div class="score-chain-row final">
-                                        <span class="label">Score Final</span>
-                                        <span class="val" id="chainFinal">-- / 100</span>
-                                    </div>
-                                </div>
+                                <div class="score-chain" id="scoreChainBox" style="margin-top:12px; display:none;"></div>
 
                                 <div class="subscore-item clickable" style="margin-top:16px;" onclick="allerAuPilier('isoos')">
-                                    <div class="subscore-header"><span>Pilier 1 : Stabilité Référence → Test <span class="info-tip" data-tip="Compare l'efficacité (profit/risque) entre les périodes de référence et les périodes de test qui les suivent, sur plusieurs fenêtres walk-forward. Plafonné si le Profit Factor du Test est trop proche de 1 (30 pts).">?</span></span><span id="scoreIsoosVal">0/30</span></div>
+                                    <div class="subscore-header"><span>Pilier 1 : Stabilité Référence → Test <span class="info-tip" data-tip="Compare l'efficacité (profit/risque) entre les périodes de référence et les périodes de test qui les suivent, sur plusieurs fenêtres walk-forward (30 pts).">?</span></span><span id="scoreIsoosVal">0/30</span></div>
                                     <div class="progress-bar"><div class="progress-fill" id="barIsoos"></div></div>
                                 </div>
                                 <div class="subscore-item clickable" onclick="allerAuPilier('montecarlo')">
@@ -2640,13 +2643,6 @@
                         </div>
                         <div class="panel-title" style="font-size:0.75rem; margin-top:18px;">Recommandations — Robustesse</div>
                         <div id="recommandationsRobustesse"></div>
-                        <div style="display:flex; gap:8px; margin-top:8px;">
-                            <button class="btn-analyser" id="btnExportPdf" style="flex:1; background:transparent; color:var(--silver-bright); border:1px solid var(--border-silver);" onclick="genererRapportPDF()" disabled>Exporter le Rapport d'Audit (PDF)</button>
-                            <button class="btn-analyser" id="btnCopierRapport" style="flex:1; background:transparent; color:var(--silver-bright); border:1px solid var(--border-silver);" onclick="copierRapportTexte()" disabled>Copier le Rapport (texte)</button>
-                        </div>
-                        <p style="font-size:0.68rem; color:var(--text-muted); margin:10px 0 0; text-align:center;">
-                            Le rapport texte est pensé pour être collé directement dans une IA ou partagé à un humain qui débogue le code. Besoin d'aller plus loin ? <span id="btnExportTradesAnnotes" style="text-decoration:underline; cursor:pointer;" onclick="exporterTradesAnnotes()">Exporter les trades annotés (CSV)</span>.
-                        </p>
                     </div>
                 </div>
             </div>
@@ -2668,6 +2664,9 @@
                                 <div class="score-num-suffix">sur 100</div>
                             </div>
                         </div>
+
+                        <div id="qualiteBadge" style="font-size:0.8rem; font-weight:700;">--</div>
+                        <div id="qualiteNote" style="font-size:0.74rem; color:var(--text-muted); line-height:1.5; margin-top:10px; padding-top:10px; border-top:1px solid var(--ash);"></div>
 
                         <div class="collapsible" style="margin-top:18px; text-align:left;">
                             <button class="collapsible-header" onclick="toggleCollapsible(this)" style="padding:12px 16px; font-size:0.74rem;">
@@ -2708,6 +2707,9 @@
                             </div>
                         </div>
 
+                        <div id="risqueBadge" style="font-size:0.8rem; font-weight:700;">--</div>
+                        <div id="risqueNote" style="font-size:0.74rem; color:var(--text-muted); line-height:1.5; margin-top:10px; padding-top:10px; border-top:1px solid var(--ash);"></div>
+
                         <div class="collapsible" style="margin-top:18px; text-align:left;">
                             <button class="collapsible-header" onclick="toggleCollapsible(this)" style="padding:12px 16px; font-size:0.74rem;">
                                 <span>Détail du calcul</span>
@@ -2729,11 +2731,11 @@
                 </div>
             </div>
 
-            <p id="scoreCombineTxt" style="display:none; font-size:0.76rem; color:var(--text-muted); text-align:center; margin:-6px 0 20px;"></p>
+
 
             <div class="collapsible">
                 <button class="collapsible-header" onclick="toggleCollapsible(this)">
-                    <span>Biais de Sélection Multiple <span class="info-tip" data-tip="Inspiré des travaux de Bailey & López de Prado sur la Probability of Backtest Overfitting et le Deflated Sharpe Ratio — mais ce n'est PAS un vrai calcul de ces statistiques, qui nécessiteraient les résultats de tous vos essais, pas seulement celui-ci.">?</span></span>
+                    <span><span class="diag-tag diag-tag-robustesse">ROBUSTESSE</span>Biais de Sélection Multiple <span class="info-tip" data-tip="Inspiré des travaux de Bailey & López de Prado sur la Probability of Backtest Overfitting et le Deflated Sharpe Ratio — mais ce n'est PAS un vrai calcul de ces statistiques, qui nécessiteraient les résultats de tous vos essais, pas seulement celui-ci.">?</span></span>
                     <span class="collapsible-chevron">▾</span>
                 </button>
                 <div class="collapsible-content">
@@ -2743,7 +2745,7 @@
                     </div>
                     <div class="method-note" style="margin-bottom:16px; border-style:solid; background:var(--ash);">
                         <span class="method-note-icon">ⓘ</span>
-                        <p><strong>Ce signal est purement informatif : il n'affecte jamais le score</strong>, contrairement au Risque de Ruine ci-dessous. La raison : contrairement aux trades eux-mêmes, le nombre de variantes testées ne laisse aucune trace objective dans les données — deux séquences de trades strictement identiques peuvent provenir d'une stratégie testée une seule fois, ou de la meilleure de 500 variantes essayées au hasard, sans qu'aucune différence ne soit visible dans les résultats. Comme cette donnée est auto-déclarée par vous et invérifiable, en faire un multiplicateur de score pénaliserait uniquement les utilisateurs honnêtes — sans aucun moyen de dissuader une sous-déclaration. XTRUNN se contente donc de vous alerter clairement, sans prétendre corriger numériquement ce qu'il ne peut pas vérifier.</p>
+                        <p><strong>Ce signal est purement informatif : il n'affecte jamais le score de Robustesse</strong> (il en va de même pour le Risque de Ruine ci-dessous, qui alimente désormais le diagnostic de Risque séparément). La raison : contrairement aux trades eux-mêmes, le nombre de variantes testées ne laisse aucune trace objective dans les données — deux séquences de trades strictement identiques peuvent provenir d'une stratégie testée une seule fois, ou de la meilleure de 500 variantes essayées au hasard, sans qu'aucune différence ne soit visible dans les résultats. Comme cette donnée est auto-déclarée par vous et invérifiable, en faire un multiplicateur de score pénaliserait uniquement les utilisateurs honnêtes — sans aucun moyen de dissuader une sous-déclaration. XTRUNN se contente donc de vous alerter clairement, sans prétendre corriger numériquement ce qu'il ne peut pas vérifier.</p>
                     </div>
                     <div class="metric-row-4">
                         <div class="mc-info-card">
@@ -2757,7 +2759,7 @@
 
             <div class="collapsible">
                 <button class="collapsible-header" onclick="toggleCollapsible(this)">
-                    <span>Risque de Ruine <span class="info-tip" data-tip="Détecte des signatures de money management dangereux (martingale, grid, moyennage à la baisse) à partir de la séquence de profits — et, si votre plateforme exportait la taille de position, directement depuis le volume réel de chaque trade.">?</span></span>
+                    <span><span class="diag-tag diag-tag-risque">RISQUE</span>Risque de Ruine <span class="info-tip" data-tip="Détecte des signatures de money management dangereux (martingale, grid, moyennage à la baisse) à partir de la séquence de profits — et, si votre plateforme exportait la taille de position, directement depuis le volume réel de chaque trade.">?</span></span>
                     <span class="collapsible-chevron">▾</span>
                 </button>
                 <div class="collapsible-content">
@@ -2823,7 +2825,7 @@
 
             <div class="collapsible">
                 <button class="collapsible-header" onclick="toggleCollapsible(this)">
-                    <span>Seuils de Surveillance pour le Suivi en Réel <span class="info-tip" data-tip="Fourchette de variabilité naturelle (bootstrap sur vos trades de Test) — la même méthode utilisée pour comparer un forward test à ce qui était prédit, mais disponible dès cette analyse, sans attendre d'avoir déjà des données de suivi.">?</span></span>
+                    <span><span class="diag-tag diag-tag-risque">RISQUE</span>Seuils de Surveillance pour le Suivi en Réel <span class="info-tip" data-tip="Fourchette de variabilité naturelle (bootstrap sur vos trades de Test) — la même méthode utilisée pour comparer un forward test à ce qui était prédit, mais disponible dès cette analyse, sans attendre d'avoir déjà des données de suivi.">?</span></span>
                     <span class="collapsible-chevron">▾</span>
                 </button>
                 <div class="collapsible-content">
@@ -2836,7 +2838,7 @@
 
             <div class="collapsible">
                 <button class="collapsible-header" onclick="toggleCollapsible(this)">
-                    <span>Analyse Comportementale <span class="info-tip" data-tip="Des motifs invisibles dans les résumés agrégés -- si détectés, un signal concret à corréler avec votre code plutôt qu'un simple constat de mauvaise performance.">?</span></span>
+                    <span><span class="diag-tag diag-tag-general">GÉNÉRAL</span>Analyse Comportementale <span class="info-tip" data-tip="Des motifs invisibles dans les résumés agrégés -- si détectés, un signal concret à corréler avec votre code plutôt qu'un simple constat de mauvaise performance. Transversal : ne nourrit aucun des trois scores.">?</span></span>
                     <span class="collapsible-chevron">▾</span>
                 </button>
                 <div class="collapsible-content">
@@ -3993,10 +3995,18 @@
                 document.getElementById('diagScoreQualite').textContent = qualite.score;
                 mettreAJourGrandAnneauGenerique(qualite.score, 'qualiteRingArc', 'qualiteRingMarker');
 
+                const qBadge = document.getElementById('qualiteBadge');
+                if (qualite.score >= 70) { qBadge.textContent = 'BONNE QUALITÉ'; qBadge.className = 'positive'; }
+                else if (qualite.score >= 40) { qBadge.textContent = 'QUALITÉ MOYENNE'; qBadge.className = 'warning'; }
+                else { qBadge.textContent = 'QUALITÉ FAIBLE'; qBadge.className = 'negative'; }
+                document.getElementById('qualiteNote').textContent = "Ce score s'appuie sur les données fournies. S'il a servi de base au réglage de la stratégie, seul un suivi en direct sur des données nouvelles confirme une vraie qualité future.";
+
                 const cartesQ = [
-                    ['Profit Factor', `${qualite.score_profit_factor}/40`],
-                    ['Sharpe Ratio', qualite.score_sharpe !== null ? `${qualite.score_sharpe}/30` : 'N/D'],
-                    ['Calmar Ratio', qualite.score_calmar !== null ? `${qualite.score_calmar}/30` : 'N/D'],
+                    ['Profit Factor', `${qualite.score_profit_factor}/25`],
+                    ['Sharpe Ratio', qualite.score_sharpe !== null ? `${qualite.score_sharpe}/20` : 'N/D'],
+                    ['Sortino Ratio', qualite.score_sortino !== null ? `${qualite.score_sortino}/20` : 'N/D'],
+                    ['Calmar Ratio', qualite.score_calmar !== null ? `${qualite.score_calmar}/20` : 'N/D'],
+                    ['Vs Benchmark', qualite.score_benchmark !== null ? `${qualite.score_benchmark}/15` : 'N/D (non renseigné)'],
                 ];
                 document.getElementById('diagQualiteDetailGrid').innerHTML = cartesQ.map(([titre, val]) =>
                     `<div class="kpi-card"><div class="kpi-label">${titre}</div><div class="kpi-value">${val}</div></div>`
@@ -4019,6 +4029,12 @@
                 panneauRisque.style.display = 'block';
                 document.getElementById('diagScoreRisque').textContent = risqueScore.score;
                 mettreAJourGrandAnneauGenerique(risqueScore.score, 'risqueRingArc', 'risqueRingMarker');
+
+                const rBadge = document.getElementById('risqueBadge');
+                if (risqueScore.score >= 70) { rBadge.textContent = 'RISQUE MAÎTRISÉ'; rBadge.className = 'positive'; }
+                else if (risqueScore.score >= 40) { rBadge.textContent = 'RISQUE MODÉRÉ'; rBadge.className = 'warning'; }
+                else { rBadge.textContent = 'RISQUE ÉLEVÉ'; rBadge.className = 'negative'; }
+                document.getElementById('risqueNote').textContent = "Ce score s'appuie sur les données fournies. S'il a servi de base au réglage de la stratégie, seul un suivi en direct sur des données nouvelles confirme un vrai niveau de risque futur.";
 
                 const cartes = [
                     ['Max Drawdown', risqueScore.score_mdd !== null ? `${risqueScore.score_mdd}/20` : 'N/D'],
@@ -4047,13 +4063,6 @@
                 panneauRisque.style.display = 'none';
             }
 
-            const scoreCombineTxt = document.getElementById('scoreCombineTxt');
-            if (data.score_combine_geometrique !== null && data.score_combine_geometrique !== undefined) {
-                scoreCombineTxt.style.display = 'block';
-                scoreCombineTxt.innerHTML = `Score Combiné (repère secondaire, moyenne géométrique des scores disponibles) : <strong>${data.score_combine_geometrique}/100</strong>`;
-            } else {
-                scoreCombineTxt.style.display = 'none';
-            }
 
             // Doit rester synchronisé avec SEUIL_SCORE_VALIDATION côté
             // backend (api.py) -- le serveur reste la seule source
@@ -4064,29 +4073,6 @@
             document.getElementById('validationUnlockBanner').style.display = seuilFranchi ? 'block' : 'none';
             if (seuilFranchi) verifierEtAfficherTutorielVO();
             derniereAnalyseAffichee = data;
-
-            // Chaîne de calcul : 4 piliers -> ×risque de ruine -> (plafond
-            // échantillon faible éventuel) -> score final. Le biais de
-            // sélection multiple n'apparaît plus ici : purement informatif,
-            // il n'affecte plus le score (voir le panneau dédié plus bas).
-            document.getElementById('chainBrut').textContent = `${rob.score_global_brut} / 100`;
-
-            const chainRuineEl = document.getElementById('chainRuine');
-            chainRuineEl.textContent = `× ${rob.mult_risque_ruine}`;
-            chainRuineEl.className = 'val' + (rob.mult_risque_ruine < 1.0 ? ' reduit' : '');
-
-            const intermediaire = Math.round(rob.score_global_brut * rob.mult_risque_ruine);
-            const capOp = document.getElementById('chainCapOp');
-            const capRow = document.getElementById('chainCapRow');
-            if (!rob.echantillon_fiable && intermediaire > 50) {
-                capOp.style.display = 'flex';
-                capRow.style.display = 'flex';
-                document.getElementById('chainCap').textContent = `${intermediaire} → 50`;
-            } else {
-                capOp.style.display = 'none';
-                capRow.style.display = 'none';
-            }
-            document.getElementById('chainFinal').textContent = `${scoreGlobal} / 100`;
 
             const fourchette = rob.score_fourchette;
             if (fourchette) {
@@ -4147,14 +4133,15 @@
             }
 
             const ruineBox = document.getElementById('ruineStatutBox');
-            if (rob.mult_risque_ruine >= 1.0) {
+            const nSignaux = risqueScore ? risqueScore.n_signaux_ruine_actifs : rob.n_signaux_ruine_actifs;
+            if (!nSignaux) {
                 ruineBox.style.background = 'rgba(74,222,128,0.08)';
                 ruineBox.style.border = '1px solid rgba(74,222,128,0.25)';
-                ruineBox.innerHTML = '<span class="positive" style="font-weight:600;">✓ Aucune signature de risque de ruine détectée.</span> Aucun ajustement appliqué au score sur cette base.';
+                ruineBox.innerHTML = '<span class="positive" style="font-weight:600;">✓ Aucune signature de risque de ruine détectée.</span> N\'affecte pas le score de Robustesse -- alimente le diagnostic de Risque ci-dessous.';
             } else {
                 ruineBox.style.background = 'rgba(201,106,99,0.08)';
                 ruineBox.style.border = '1px solid rgba(201,106,99,0.25)';
-                ruineBox.innerHTML = `<span class="negative" style="font-weight:600;">⚠ Signature(s) de risque de ruine détectée(s).</span> Score multiplié par ${rob.mult_risque_ruine} pour en tenir compte — voir les alertes ci-dessus (Diagnostic) pour le détail. Vérifiez manuellement le money management de votre stratégie (taille de position fixe ou variable ?) avant de conclure.`;
+                ruineBox.innerHTML = `<span class="negative" style="font-weight:600;">⚠ ${nSignaux} signature(s) de risque de ruine détectée(s).</span> N'affecte pas le score de Robustesse -- pris en compte dans le diagnostic de Risque, pas ici. Vérifiez manuellement le money management de votre stratégie (taille de position fixe ou variable ?) avant de conclure.`;
             }
 
             const badge = document.getElementById('scoreBadge');
