@@ -1864,9 +1864,11 @@ def calculer_ratios_performance(trades_array, details_list, capital_initial, cou
 # comment il a été calculé). Affichés côte à côte, sans hiérarchie.
 # ============================================================
 
-POIDS_QUALITE_PROFIT_FACTOR = 40
-POIDS_QUALITE_SHARPE = 30
-POIDS_QUALITE_CALMAR = 30
+POIDS_QUALITE_PROFIT_FACTOR = 25
+POIDS_QUALITE_SHARPE = 20
+POIDS_QUALITE_SORTINO = 20
+POIDS_QUALITE_CALMAR = 20
+POIDS_QUALITE_BENCHMARK = 15
 # Le plafond de score (PF >= 3.0 -> score plein) reste inchangé -- il
 # correspond à la fourchette "très bon/robuste" citée par plusieurs
 # sources. Mais au-delà de ce seuil-ci, le consensus de ces mêmes sources
@@ -1894,10 +1896,14 @@ def _score_par_paliers(valeur, paliers):
 def calculer_score_qualite(oos_profit_factor, ratios_performance):
     """
     Score 0-100 distinct, jamais mélangé au score de Robustesse. Repose sur
-    trois axes complémentaires : le Profit Factor (marge de profitabilité
-    brute), le Sharpe (rendement ajusté à la volatilité moyenne) et le
-    Calmar (rendement ajusté au pire drawdown) -- trois façons différentes
-    de juger si le résultat est bon, pas juste stable.
+    cinq axes complémentaires : le Profit Factor (marge de profitabilité
+    brute), le Sharpe (rendement ajusté à la volatilité moyenne, pénalise
+    toute volatilité y compris les bonnes surprises), le Sortino (même
+    idée mais ne pénalise que la volatilité défavorable), le Calmar
+    (rendement ajusté au pire drawdown) et l'écart au benchmark (la
+    stratégie bat-elle un simple achat-conservation, ou profite-t-elle
+    juste d'un marché haussier ?) -- cinq façons différentes de juger si
+    le résultat est bon, pas juste stable.
 
     Retourne None si les ratios de performance n'ont pas pu être calculés
     (historique trop épars en jours actifs distincts) : un score partiel
@@ -1908,37 +1914,67 @@ def calculer_score_qualite(oos_profit_factor, ratios_performance):
         return None
 
     score_pf = _score_par_paliers(oos_profit_factor, [
-        (1.0, 0), (1.3, 15), (2.0, 30), (3.0, POIDS_QUALITE_PROFIT_FACTOR),
+        (1.0, 0), (1.3, 9), (2.0, 19), (3.0, POIDS_QUALITE_PROFIT_FACTOR),
     ])
 
     sharpe = ratios_performance.get("sharpe_ratio")
     if sharpe is not None:
         score_sharpe = _score_par_paliers(sharpe, [
-            (0.0, 0), (1.0, 15), (2.0, 25), (3.0, POIDS_QUALITE_SHARPE),
+            (0.0, 0), (1.0, 10), (2.0, 17), (3.0, POIDS_QUALITE_SHARPE),
         ])
     else:
         score_sharpe = None
 
+    # Sortino : seuils légèrement plus hauts que Sharpe (convention citée :
+    # >1.5 bon, >3 excellent), puisqu'il ne pénalise que la volatilité
+    # défavorable -- un chiffre équivalent y est structurellement plus
+    # facile à atteindre que sur Sharpe.
+    sortino = ratios_performance.get("sortino_ratio")
+    if sortino is not None:
+        score_sortino = _score_par_paliers(sortino, [
+            (0.0, 0), (1.5, 12), (3.0, POIDS_QUALITE_SORTINO),
+        ])
+    else:
+        score_sortino = None
+
     calmar = ratios_performance.get("calmar_ratio")
     if calmar is not None:
         score_calmar = _score_par_paliers(calmar, [
-            (0.5, 0), (1.0, 10), (3.0, 25), (5.0, POIDS_QUALITE_CALMAR),
+            (0.5, 0), (1.0, 7), (3.0, 17), (5.0, POIDS_QUALITE_CALMAR),
         ])
     else:
         score_calmar = None
 
-    # Si Sharpe ou Calmar manque (cas rare : rendements journaliers valides
-    # mais drawdown nul par exemple), on redistribue son poids sur le
-    # Profit Factor plutôt que d'inventer une valeur -- jamais de score
+    # Écart au benchmark : n'existe que si l'utilisateur a saisi le
+    # rendement d'un indice ou d'un achat-conservation sur la même
+    # période (Réglages Complémentaires) -- reste optionnel, pas de repli
+    # arbitraire s'il est absent.
+    excess = ratios_performance.get("excess_return_vs_benchmark_pct")
+    if excess is not None:
+        score_benchmark = _score_par_paliers(excess, [
+            (0.0, 0), (10.0, 8), (25.0, POIDS_QUALITE_BENCHMARK),
+        ])
+    else:
+        score_benchmark = None
+
+    # Si un axe manque (rendements journaliers valides mais drawdown nul,
+    # ou benchmark non renseigné), on redistribue son poids sur les axes
+    # disponibles plutôt que d'inventer une valeur -- jamais de score
     # partiel présenté comme complet sans le signaler.
     composantes_actives = [("pf", score_pf, POIDS_QUALITE_PROFIT_FACTOR)]
     poids_total = POIDS_QUALITE_PROFIT_FACTOR
     if score_sharpe is not None:
         composantes_actives.append(("sharpe", score_sharpe, POIDS_QUALITE_SHARPE))
         poids_total += POIDS_QUALITE_SHARPE
+    if score_sortino is not None:
+        composantes_actives.append(("sortino", score_sortino, POIDS_QUALITE_SORTINO))
+        poids_total += POIDS_QUALITE_SORTINO
     if score_calmar is not None:
         composantes_actives.append(("calmar", score_calmar, POIDS_QUALITE_CALMAR))
         poids_total += POIDS_QUALITE_CALMAR
+    if score_benchmark is not None:
+        composantes_actives.append(("benchmark", score_benchmark, POIDS_QUALITE_BENCHMARK))
+        poids_total += POIDS_QUALITE_BENCHMARK
 
     score_brut = sum(s for _, s, _ in composantes_actives)
     score_final = int(round(score_brut / poids_total * 100)) if poids_total > 0 else 0
@@ -1948,7 +1984,9 @@ def calculer_score_qualite(oos_profit_factor, ratios_performance):
         "score": score_final,
         "score_profit_factor": round(score_pf, 1),
         "score_sharpe": round(score_sharpe, 1) if score_sharpe is not None else None,
+        "score_sortino": round(score_sortino, 1) if score_sortino is not None else None,
         "score_calmar": round(score_calmar, 1) if score_calmar is not None else None,
+        "score_benchmark": round(score_benchmark, 1) if score_benchmark is not None else None,
         "oos_profit_factor_utilise": round(oos_profit_factor, 2),
         "pf_suspicieusement_eleve": bool(oos_profit_factor >= SEUIL_PF_SUSPICIEUSEMENT_ELEVE),
     }
