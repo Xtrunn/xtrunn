@@ -3709,13 +3709,24 @@ def construire_resultat_analyse(
         if len(oos_trades) >= MIN_TRADES_ABSOLUTE else None
     )
 
-    # Rassemblement des alertes de santé
+    # Rassemblement des alertes de santé et des recommandations -- chaque
+    # entrée porte désormais un diagnostic d'appartenance ("robustesse",
+    # "qualite", "risque" ou "donnees" pour les questions de qualité de
+    # données qui ne relèvent d'aucun score précis) et un type ("alerte"
+    # pour un problème constaté, "recommandation" pour une piste d'action
+    # ou une donnée à fournir). Les signaux qui alimentent désormais le
+    # score de Risque (récupération, coûts, signatures de ruine) sont
+    # taggés "risque", pas "robustesse", même si leur calcul historique
+    # vit dans le même pipeline.
+    def tagger(liste, diagnostic, type_):
+        return [dict(w, diagnostic=diagnostic, type=type_) for w in liste]
+
     toutes_les_alertes = (
-        [dict(w, pilier="diagnostics") for w in import_warnings]
-        + [dict(w, pilier="isoos") for w in pilier2_res["warnings"]]
-        + [dict(w, pilier="pilier3") for w in pilier3_res["warnings"]]
-        + [dict(w, pilier="pilier4") for w in pilier4_res["warnings"]]
-        + [dict(w, pilier="diagnostics") for w in risque_ruine_res["alertes"]]
+        tagger(import_warnings, "donnees", "recommandation")
+        + tagger(pilier2_res["warnings"], "robustesse", "alerte")
+        + tagger(pilier3_res["warnings"], "robustesse", "alerte")
+        + tagger(pilier4_res["warnings"], "robustesse", "alerte")
+        + tagger(risque_ruine_res["alertes"], "risque", "alerte")
     )
 
     # Absence totale ou quasi-totale de pertes : signal direct, vérifié
@@ -3726,13 +3737,21 @@ def construire_resultat_analyse(
     if len(oos_trades) >= MIN_TRADES_ABSOLUTE:
         if n_perdants_oos == 0:
             toutes_les_alertes.insert(0, {
-                "level": "critical", "pilier": "diagnostics",
-                "message": f"Aucune perte enregistrée sur les {len(oos_trades)} trades testés — extrêmement suspect. Vérifiez qu'un stop loss est bien configuré : un backtest sans aucune perte cache souvent un risque non protégé, où une seule perte imprévue pourrait effacer tout le gain accumulé, voire plus."
+                "level": "critical", "diagnostic": "risque", "type": "alerte",
+                "message": f"Aucune perte enregistrée sur les {len(oos_trades)} trades testés — extrêmement suspect. Un backtest sans aucune perte cache souvent un risque non protégé, où une seule perte imprévue pourrait effacer tout le gain accumulé, voire plus."
+            })
+            toutes_les_alertes.append({
+                "level": "warning", "diagnostic": "risque", "type": "recommandation",
+                "message": "Vérifiez qu'un stop loss est bien configuré sur cette stratégie avant de conclure quoi que ce soit d'autre."
             })
         elif n_perdants_oos / len(oos_trades) < 0.03:
             toutes_les_alertes.append({
-                "level": "warning", "pilier": "diagnostics",
-                "message": f"Très peu de pertes enregistrées ({n_perdants_oos} sur {len(oos_trades)} trades testés, {n_perdants_oos / len(oos_trades) * 100:.1f}%) — vérifiez que le stop loss est correctement configuré et testé, ce profil peut cacher un risque mal protégé plutôt qu'une vraie qualité de signal."
+                "level": "warning", "diagnostic": "risque", "type": "alerte",
+                "message": f"Très peu de pertes enregistrées ({n_perdants_oos} sur {len(oos_trades)} trades testés, {n_perdants_oos / len(oos_trades) * 100:.1f}%) — ce profil peut cacher un risque mal protégé plutôt qu'une vraie qualité de signal."
+            })
+            toutes_les_alertes.append({
+                "level": "warning", "diagnostic": "risque", "type": "recommandation",
+                "message": "Vérifiez que le stop loss est correctement configuré et testé sur cette stratégie."
             })
 
     if ratio_risque_recompense is not None:
@@ -3740,85 +3759,97 @@ def construire_resultat_analyse(
         ratio = ratio_risque_recompense["ratio_median"]
         if niveau == "extreme":
             toutes_les_alertes.append({
-                "level": "warning", "pilier": "diagnostics",
+                "level": "warning", "diagnostic": "risque", "type": "recommandation",
                 "message": f"À titre informatif (n'affecte pas le score) : votre stop loss est configuré en moyenne {ratio:.1f}x plus loin que votre take profit. Ce n'est pas nécessairement un problème si la taille de position est réduite en conséquence — mais si elle reste fixe, une seule perte peut effacer de nombreux gains. Vérifiez votre money management avant de conclure."
             })
         elif niveau == "notable":
             toutes_les_alertes.append({
-                "level": "warning", "pilier": "diagnostics",
+                "level": "warning", "diagnostic": "risque", "type": "recommandation",
                 "message": f"À titre informatif (n'affecte pas le score) : votre stop loss est configuré en moyenne {ratio:.1f}x plus loin que votre take profit — un profil à surveiller si la taille de position ne s'ajuste pas en conséquence."
             })
 
     note_biais_selection = message_biais_selection(n_trials_testes)
     if n_trials_testes is None:
         toutes_les_alertes.append({
-            "level": "warning", "pilier": "diagnostics",
-            "message": "Nombre de variantes testées non renseigné : à titre indicatif seulement (n'affecte pas le score), renseignez-le dans le Diagnostic pour une mise en garde contextualisée sur le biais de sélection multiple."
+            "level": "warning", "diagnostic": "robustesse", "type": "recommandation",
+            "message": "Nombre de variantes testées non renseigné : renseignez-le dans les Réglages Complémentaires pour une mise en garde contextualisée sur le biais de sélection multiple."
         })
     elif n_trials_testes >= N_TRIALS_CRITICAL_THRESHOLD:
         toutes_les_alertes.append({
-            "level": "warning", "pilier": "diagnostics",
+            "level": "warning", "diagnostic": "robustesse", "type": "alerte",
             "message": f"À titre informatif (n'affecte pas le score) : {n_trials_testes} variantes testées avant celle-ci. Même un résultat jamais vu pendant les tests reste biaisé par la sélection de la meilleure variante parmi tant d'autres — voir 'Biais de Sélection' dans le Diagnostic pour comprendre pourquoi."
         })
     elif n_trials_testes >= N_TRIALS_WARNING_THRESHOLD:
         toutes_les_alertes.append({
-            "level": "warning", "pilier": "diagnostics",
+            "level": "warning", "diagnostic": "robustesse", "type": "alerte",
             "message": f"À titre informatif (n'affecte pas le score) : {n_trials_testes} variantes testées avant celle-ci — voir 'Biais de Sélection' dans le Diagnostic."
         })
 
     if fiabilite_evaluation["statut"] == "insuffisante":
         toutes_les_alertes.insert(0, {
-            "level": "critical",
-            "pilier": "diagnostics",
+            "level": "critical", "diagnostic": "robustesse", "type": "alerte",
             "message": fiabilite_evaluation["raisons"][0] + " La robustesse calculée reste affichée, mais sa portée interprétative est très limitée."
         })
     elif fiabilite_evaluation["statut"] == "limitée":
         toutes_les_alertes.insert(0, {
-            "level": "warning",
-            "pilier": "diagnostics",
+            "level": "warning", "diagnostic": "robustesse", "type": "alerte",
             "message": fiabilite_evaluation["raisons"][0] + " Interprétez le score avec davantage de prudence."
         })
     if couverture_temporelle is not None:
         span = couverture_temporelle["span_jours"]
         if span < SPAN_JOURS_CRITIQUE:
             toutes_les_alertes.append({
-                "level": "critical", "pilier": "diagnostics",
+                "level": "critical", "diagnostic": "robustesse", "type": "alerte",
                 "message": f"Historique très court : seulement {span} jours au total. Une période aussi courte offre une couverture limitée des conditions de marché observées — la portée interprétative du score est donc réduite."
             })
         elif span < SPAN_JOURS_AVERTISSEMENT:
             toutes_les_alertes.append({
-                "level": "warning", "pilier": "diagnostics",
+                "level": "warning", "diagnostic": "robustesse", "type": "alerte",
                 "message": f"Historique de moins d'un an ({span} jours) : votre stratégie n'a peut-être pas encore été testée sur des conditions de marché très différentes de celles observées jusqu'ici."
             })
     if mc_res["path_sensitivity_ratio"] is not None and mc_res["path_sensitivity_ratio"] >= 2.5:
         toutes_les_alertes.append({
-            "level": "warning", "pilier": "montecarlo",
+            "level": "warning", "diagnostic": "robustesse", "type": "alerte",
             "message": f"Le drawdown observé dépend sensiblement de l'ordre des trades : parmi les réordonnancements testés, un scénario pessimiste plausible atteint jusqu'à {mc_res['path_sensitivity_ratio']:.1f}x le drawdown observé."
         })
     if mc_res["stress_recovery_factor"] is not None and mc_res["stress_recovery_factor"] < 1.0:
         toutes_les_alertes.append({
-            "level": "critical", "pilier": "montecarlo",
+            "level": "critical", "diagnostic": "risque", "type": "alerte",
             "message": "Dans un scénario de drawdown pessimiste mais plausible, le profit ne suffirait pas à couvrir le risque pris."
         })
     if fragilite_res["bootstrap_prob_positif"] < 60:
         toutes_les_alertes.append({
-            "level": "warning", "pilier": "stresspro",
+            "level": "warning", "diagnostic": "robustesse", "type": "alerte",
             "message": f"Fragilité : en retirant au hasard {int(STRESS_DROP_RATIO*100)}% des trades (des milliers de fois), seulement {fragilite_res['bootstrap_prob_positif']}% des cas restent rentables — le résultat dépend peut-être de quelques trades précis plutôt que d'un avantage réel et répétable."
         })
     if not costs_res["profitable_under_cost_stress"]:
         toutes_les_alertes.append({
-            "level": "critical", "pilier": "stresspro",
+            "level": "critical", "diagnostic": "risque", "type": "alerte",
             "message": "En simulant des frais de courtage/spread plus élevés, la stratégie devient déficitaire — sa marge est trop fine pour absorber des conditions réelles un peu moins favorables."
         })
     if rolling_res.get("rolling_insuffisant", False):
         toutes_les_alertes.append({
-            "level": "info", "pilier": "stresspro",
+            "level": "info", "diagnostic": "robustesse", "type": "alerte",
             "message": "Historique insuffisant pour tester la stabilité temporelle avec les fenêtres rolling configurées — aucune conclusion d'instabilité ne peut être tirée de ce test."
         })
     elif not rolling_res["rolling_stable"]:
         toutes_les_alertes.append({
-            "level": "warning", "pilier": "stresspro",
+            "level": "warning", "diagnostic": "robustesse", "type": "alerte",
             "message": f"Instabilité dans le temps : seulement {rolling_res['rolling_profitable_pct']}% des périodes de l'historique sont individuellement rentables — la performance globale repose peut-être sur une seule bonne période plutôt que d'être régulière."
+        })
+    if qualite_perf_res is not None and qualite_perf_res.get("pf_suspicieusement_eleve"):
+        toutes_les_alertes.append({
+            "level": "warning", "diagnostic": "qualite", "type": "alerte",
+            "message": f"Profit Factor inhabituellement élevé ({qualite_perf_res['oos_profit_factor_utilise']}) : plusieurs sources spécialisées considèrent qu'un Profit Factor aussi élevé est lui-même un signal à vérifier (surapprentissage probable ou échantillon trop petit), plutôt qu'un signe de qualité supplémentaire."
+        })
+        toutes_les_alertes.append({
+            "level": "warning", "diagnostic": "qualite", "type": "recommandation",
+            "message": "Confirmez ce Profit Factor sur un historique plus long avant de vous y fier -- le score de Qualité ne le pénalise pas directement, c'est au diagnostic de Robustesse de juger si ce résultat tient dans le temps."
+        })
+    if risque_res is not None and risque_res.get("mdd_source") == "calcule":
+        toutes_les_alertes.append({
+            "level": "info", "diagnostic": "risque", "type": "recommandation",
+            "message": "Le Max Drawdown utilisé pour le diagnostic de Risque est celui estimé par XTRUNN à partir des trades clôturés -- saisissez le vrai Max Equity Drawdown dans les Réglages Complémentaires (il inclut les positions encore ouvertes) pour un diagnostic plus précis."
         })
 
     if len(toutes_les_alertes) == 0:
