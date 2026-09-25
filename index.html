@@ -2634,10 +2634,12 @@
                     </div>
 
                     <div class="diag-checklist">
-                        <div class="panel-title" style="font-size:0.75rem;">Alertes de Santé & Recommandations</div>
+                        <div class="panel-title" style="font-size:0.75rem;">Alertes de Santé — Robustesse</div>
                         <div id="checklistContent">
                             <p style="color:var(--text-muted); font-size:0.8rem;">Chargez vos fichiers d'analyse pour générer le rapport.</p>
                         </div>
+                        <div class="panel-title" style="font-size:0.75rem; margin-top:18px;">Recommandations — Robustesse</div>
+                        <div id="recommandationsRobustesse"></div>
                         <div style="display:flex; gap:8px; margin-top:8px;">
                             <button class="btn-analyser" id="btnExportPdf" style="flex:1; background:transparent; color:var(--silver-bright); border:1px solid var(--border-silver);" onclick="genererRapportPDF()" disabled>Exporter le Rapport d'Audit (PDF)</button>
                             <button class="btn-analyser" id="btnCopierRapport" style="flex:1; background:transparent; color:var(--silver-bright); border:1px solid var(--border-silver);" onclick="copierRapportTexte()" disabled>Copier le Rapport (texte)</button>
@@ -2649,52 +2651,85 @@
                 </div>
             </div>
 
-            <div class="panel" id="panneauQualiteRisque" style="display:none;">
-                <div class="panel-title">Qualité, Risque & Score Combiné</div>
-                <p style="font-size:0.78rem; color:var(--text-muted); margin:8px 0 16px; line-height:1.5;">
-                    Deux diagnostics distincts de la Robustesse ci-dessus, jamais mélangés avec elle. La Qualité répond à "si ce backtest se reproduit, est-ce que ça vaut la peine d'être tradé ?". Le Risque répond à "peu importe si c'est robuste et rentable, à quel point le pire scénario réaliste fait-il mal ?"
-                </p>
-                <div class="metric-row-4">
-                    <div class="mc-info-card">
-                        <div class="mc-info-title">Qualité / Performance</div>
-                        <div class="mc-info-val" id="diagScoreQualite">--</div>
-                    </div>
-                    <div class="mc-info-card">
-                        <div class="mc-info-title">Risque</div>
-                        <div class="mc-info-val" id="diagScoreRisque">--</div>
-                    </div>
-                    <div class="mc-info-card">
-                        <div class="mc-info-title">Score Combiné <span class="info-tip" data-tip="Moyenne géométrique des scores disponibles, pas une moyenne classique : un score bas sur un seul axe tire ce chiffre vers le bas de façon disproportionnée plutôt que d'être dilué. Un repère secondaire seulement -- les scores ci-dessus restent la référence.">?</span></div>
-                        <div class="mc-info-val" id="diagScoreCombine">--</div>
-                    </div>
-                    <div class="mc-info-card">
-                        <div class="mc-info-title">&nbsp;</div>
-                        <div class="mc-info-val">&nbsp;</div>
-                    </div>
-                </div>
+            <div class="panel" id="panneauQualite" style="display:none;">
+                <div class="panel-title">Diagnostic & Score de Qualité</div>
+                <div class="diag-grid">
+                    <div class="score-box">
+                        <div style="font-size:0.68rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px;">Score de Qualité / Performance <span class="info-tip" data-tip="Répond à une question différente de la Robustesse : si ce backtest se reproduit fidèlement, est-ce que ça vaut la peine d'être tradé ? Ne dit rien sur la fiabilité du résultat -- voir le diagnostic de Robustesse pour ça.">?</span></div>
 
-                <div class="collapsible" style="margin-top:16px;">
-                    <button class="collapsible-header" onclick="toggleCollapsible(this)">
-                        <span>Détail du score de Qualité</span>
-                        <span class="collapsible-chevron">▾</span>
-                    </button>
-                    <div class="collapsible-content">
-                        <div class="stats-detail-grid" id="diagQualiteDetailGrid"></div>
-                        <p id="diagQualitePfAlerteTxt" style="display:none; font-size:0.78rem; color:var(--warning); margin:14px 0 0; padding:10px 12px; background:rgba(201,166,99,0.08); border:1px solid rgba(201,166,99,0.25); border-radius:8px;"></p>
-                    </div>
-                </div>
+                        <div class="horizon-ring-wrap">
+                            <svg viewBox="0 0 168 168">
+                                <circle class="horizon-ring-track" cx="84" cy="84" r="74"></circle>
+                                <circle class="horizon-ring-arc" id="qualiteRingArc" cx="84" cy="84" r="74" stroke-dasharray="464.96" stroke-dashoffset="464.96"></circle>
+                                <circle class="horizon-ring-marker" id="qualiteRingMarker" cx="158" cy="84" r="4"></circle>
+                            </svg>
+                            <div class="horizon-ring-center">
+                                <div class="score-num" id="diagScoreQualite">--</div>
+                                <div class="score-num-suffix">sur 100</div>
+                            </div>
+                        </div>
 
-                <div class="collapsible" style="margin-top:16px;">
-                    <button class="collapsible-header" onclick="toggleCollapsible(this)">
-                        <span>Détail du score de Risque</span>
-                        <span class="collapsible-chevron">▾</span>
-                    </button>
-                    <div class="collapsible-content">
-                        <div class="stats-detail-grid" id="diagRisqueDetailGrid"></div>
-                        <p id="diagRisqueMddSourceTxt" style="font-size:0.72rem; color:var(--text-muted); margin:12px 0 0;"></p>
+                        <div class="collapsible" style="margin-top:18px; text-align:left;">
+                            <button class="collapsible-header" onclick="toggleCollapsible(this)" style="padding:12px 16px; font-size:0.74rem;">
+                                <span>Détail du calcul</span>
+                                <span class="collapsible-chevron">▾</span>
+                            </button>
+                            <div class="collapsible-content" style="padding:0 16px;">
+                                <div class="stats-detail-grid" id="diagQualiteDetailGrid" style="margin-top:8px;"></div>
+                                <p id="diagQualitePfAlerteTxt" style="display:none; font-size:0.76rem; color:var(--warning); margin:14px 0 0; padding:10px 12px; background:rgba(201,166,99,0.08); border:1px solid rgba(201,166,99,0.25); border-radius:8px;"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="diag-checklist">
+                        <div class="panel-title" style="font-size:0.75rem;">Alertes de Santé — Qualité</div>
+                        <div id="checklistQualite"></div>
+                        <div class="panel-title" style="font-size:0.75rem; margin-top:18px;">Recommandations — Qualité</div>
+                        <div id="recommandationsQualite"></div>
                     </div>
                 </div>
             </div>
+
+            <div class="panel" id="panneauRisque" style="display:none;">
+                <div class="panel-title">Diagnostic & Score de Risque</div>
+                <div class="diag-grid">
+                    <div class="score-box">
+                        <div style="font-size:0.68rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px;">Score de Risque <span class="info-tip" data-tip="Répond à une troisième question, distincte des deux autres : peu importe si c'est robuste et rentable, à quel point le pire scénario réaliste fait-il mal ?">?</span></div>
+
+                        <div class="horizon-ring-wrap">
+                            <svg viewBox="0 0 168 168">
+                                <circle class="horizon-ring-track" cx="84" cy="84" r="74"></circle>
+                                <circle class="horizon-ring-arc" id="risqueRingArc" cx="84" cy="84" r="74" stroke-dasharray="464.96" stroke-dashoffset="464.96"></circle>
+                                <circle class="horizon-ring-marker" id="risqueRingMarker" cx="158" cy="84" r="4"></circle>
+                            </svg>
+                            <div class="horizon-ring-center">
+                                <div class="score-num" id="diagScoreRisque">--</div>
+                                <div class="score-num-suffix">sur 100</div>
+                            </div>
+                        </div>
+
+                        <div class="collapsible" style="margin-top:18px; text-align:left;">
+                            <button class="collapsible-header" onclick="toggleCollapsible(this)" style="padding:12px 16px; font-size:0.74rem;">
+                                <span>Détail du calcul</span>
+                                <span class="collapsible-chevron">▾</span>
+                            </button>
+                            <div class="collapsible-content" style="padding:0 16px;">
+                                <div class="stats-detail-grid" id="diagRisqueDetailGrid" style="margin-top:8px;"></div>
+                                <p id="diagRisqueMddSourceTxt" style="font-size:0.72rem; color:var(--text-muted); margin:12px 0 0;"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="diag-checklist">
+                        <div class="panel-title" style="font-size:0.75rem;">Alertes de Santé — Risque</div>
+                        <div id="checklistRisque"></div>
+                        <div class="panel-title" style="font-size:0.75rem; margin-top:18px;">Recommandations — Risque</div>
+                        <div id="recommandationsRisque"></div>
+                    </div>
+                </div>
+            </div>
+
+            <p id="scoreCombineTxt" style="display:none; font-size:0.76rem; color:var(--text-muted); text-align:center; margin:-6px 0 20px;"></p>
 
             <div class="collapsible">
                 <button class="collapsible-header" onclick="toggleCollapsible(this)">
@@ -3950,64 +3985,74 @@
             }
 
             // Panneau Diagnostic : Qualité, Risque & Score Combiné --
-            // n'apparaît que si au moins un des deux diagnostics annexes a
-            // pu être calculé, pour ne jamais afficher un panneau vide.
-            const panneauQR = document.getElementById('panneauQualiteRisque');
-            if (qualite || risqueScore) {
-                panneauQR.style.display = 'block';
-                document.getElementById('diagScoreQualite').textContent = qualite ? `${qualite.score}/100` : 'N/D';
-                document.getElementById('diagScoreRisque').textContent = risqueScore ? `${risqueScore.score}/100` : 'N/D';
-                document.getElementById('diagScoreCombine').textContent = (data.score_combine_geometrique !== null && data.score_combine_geometrique !== undefined) ? `${data.score_combine_geometrique}/100` : 'N/D';
+            // n'apparaissent que si le diagnostic correspondant a pu être
+            // calculé, pour ne jamais afficher un panneau vide.
+            const panneauQualite = document.getElementById('panneauQualite');
+            if (qualite) {
+                panneauQualite.style.display = 'block';
+                document.getElementById('diagScoreQualite').textContent = qualite.score;
+                mettreAJourGrandAnneauGenerique(qualite.score, 'qualiteRingArc', 'qualiteRingMarker');
 
-                if (qualite) {
-                    const cartesQ = [
-                        ['Profit Factor', `${qualite.score_profit_factor}/40`],
-                        ['Sharpe Ratio', qualite.score_sharpe !== null ? `${qualite.score_sharpe}/30` : 'N/D'],
-                        ['Calmar Ratio', qualite.score_calmar !== null ? `${qualite.score_calmar}/30` : 'N/D'],
-                    ];
-                    document.getElementById('diagQualiteDetailGrid').innerHTML = cartesQ.map(([titre, val]) =>
-                        `<div class="kpi-card"><div class="kpi-label">${titre}</div><div class="kpi-value">${val}</div></div>`
-                    ).join('');
-                    const alerteTxt = document.getElementById('diagQualitePfAlerteTxt');
-                    if (qualite.pf_suspicieusement_eleve) {
-                        alerteTxt.style.display = 'block';
-                        alerteTxt.textContent = `Profit Factor inhabituellement élevé (${qualite.oos_profit_factor_utilise}) : au-delà de ce niveau, plusieurs sources spécialisées considèrent qu'un Profit Factor aussi élevé est lui-même un signal à vérifier (surapprentissage probable ou échantillon trop petit), plutôt qu'un signe de qualité supplémentaire. Le score de Qualité ne baisse pas pour cette seule raison -- c'est le rôle du diagnostic de Robustesse -- mais ce chiffre mérite d'être confirmé sur un historique plus long.`;
-                    } else {
-                        alerteTxt.style.display = 'none';
-                    }
+                const cartesQ = [
+                    ['Profit Factor', `${qualite.score_profit_factor}/40`],
+                    ['Sharpe Ratio', qualite.score_sharpe !== null ? `${qualite.score_sharpe}/30` : 'N/D'],
+                    ['Calmar Ratio', qualite.score_calmar !== null ? `${qualite.score_calmar}/30` : 'N/D'],
+                ];
+                document.getElementById('diagQualiteDetailGrid').innerHTML = cartesQ.map(([titre, val]) =>
+                    `<div class="kpi-card"><div class="kpi-label">${titre}</div><div class="kpi-value">${val}</div></div>`
+                ).join('');
+                const alerteTxt = document.getElementById('diagQualitePfAlerteTxt');
+                if (qualite.pf_suspicieusement_eleve) {
+                    alerteTxt.style.display = 'block';
+                    alerteTxt.textContent = `Profit Factor inhabituellement élevé (${qualite.oos_profit_factor_utilise}) : au-delà de ce niveau, plusieurs sources spécialisées considèrent qu'un Profit Factor aussi élevé est lui-même un signal à vérifier (surapprentissage probable ou échantillon trop petit), plutôt qu'un signe de qualité supplémentaire. Le score de Qualité ne baisse pas pour cette seule raison -- c'est le rôle du diagnostic de Robustesse -- mais ce chiffre mérite d'être confirmé sur un historique plus long.`;
                 } else {
-                    document.getElementById('diagQualiteDetailGrid').innerHTML = '';
-                    document.getElementById('diagQualitePfAlerteTxt').style.display = 'none';
+                    alerteTxt.style.display = 'none';
                 }
-
-                if (risqueScore) {
-                    const cartes = [
-                        ['Max Drawdown', risqueScore.score_mdd !== null ? `${risqueScore.score_mdd}/20` : 'N/D'],
-                        ['Facteur de Récupération', risqueScore.score_recovery !== null ? `${risqueScore.score_recovery}/20` : 'N/D'],
-                        ['Signaux de Risque de Ruine', `${risqueScore.score_signaux_ruine}/20`],
-                        ['Viabilité sous Stress de Coûts', risqueScore.score_couts !== null ? `${risqueScore.score_couts}/15` : 'N/D'],
-                        ['Série de Pertes Consécutives', risqueScore.score_serie_pertes !== null ? `${risqueScore.score_serie_pertes}/10` : 'N/D'],
-                        ['Durée du Drawdown', risqueScore.score_duree_dd !== null ? `${risqueScore.score_duree_dd}/15` : 'N/D'],
-                    ];
-                    document.getElementById('diagRisqueDetailGrid').innerHTML = cartes.map(([titre, val]) =>
-                        `<div class="kpi-card"><div class="kpi-label">${titre}</div><div class="kpi-value">${val}</div></div>`
-                    ).join('');
-                    let sourceTxt = risqueScore.mdd_source === 'manuel'
-                        ? `Max Drawdown utilisé pour ce diagnostic : celui que vous avez saisi (${risqueScore.mdd_utilise_pct}%).`
-                        : `Max Drawdown utilisé pour ce diagnostic : celui estimé par XTRUNN à partir des trades clôturés (${risqueScore.mdd_utilise_pct}%) — saisissez le vrai Max Equity Drawdown dans les Réglages Complémentaires pour plus de précision.`;
-                    if (risqueScore.duree_dd_jours !== null && risqueScore.duree_dd_jours !== undefined) {
-                        sourceTxt += ` Plus long temps sous l'eau observé : ${risqueScore.duree_dd_jours} jours.`;
-                        if (risqueScore.duree_dd_toujours_en_cours) {
-                            sourceTxt += ` Ce temps sous l'eau n'était pas encore terminé à la fin de l'historique testé — le vrai pire cas pourrait être plus long.`;
-                        }
-                    }
-                    document.getElementById('diagRisqueMddSourceTxt').textContent = sourceTxt;
-                } else {
-                    document.getElementById('diagRisqueDetailGrid').innerHTML = '';
-                    document.getElementById('diagRisqueMddSourceTxt').textContent = '';
-                }
+                genererChecklist(rob.warnings, 'checklistQualite', 'qualite', 'alerte');
+                genererChecklist(rob.warnings, 'recommandationsQualite', 'qualite', 'recommandation');
             } else {
-                panneauQR.style.display = 'none';
+                panneauQualite.style.display = 'none';
+            }
+
+            const panneauRisque = document.getElementById('panneauRisque');
+            if (risqueScore) {
+                panneauRisque.style.display = 'block';
+                document.getElementById('diagScoreRisque').textContent = risqueScore.score;
+                mettreAJourGrandAnneauGenerique(risqueScore.score, 'risqueRingArc', 'risqueRingMarker');
+
+                const cartes = [
+                    ['Max Drawdown', risqueScore.score_mdd !== null ? `${risqueScore.score_mdd}/20` : 'N/D'],
+                    ['Facteur de Récupération', risqueScore.score_recovery !== null ? `${risqueScore.score_recovery}/20` : 'N/D'],
+                    ['Signaux de Risque de Ruine', `${risqueScore.score_signaux_ruine}/20`],
+                    ['Viabilité sous Stress de Coûts', risqueScore.score_couts !== null ? `${risqueScore.score_couts}/15` : 'N/D'],
+                    ['Série de Pertes Consécutives', risqueScore.score_serie_pertes !== null ? `${risqueScore.score_serie_pertes}/10` : 'N/D'],
+                    ['Durée du Drawdown', risqueScore.score_duree_dd !== null ? `${risqueScore.score_duree_dd}/15` : 'N/D'],
+                ];
+                document.getElementById('diagRisqueDetailGrid').innerHTML = cartes.map(([titre, val]) =>
+                    `<div class="kpi-card"><div class="kpi-label">${titre}</div><div class="kpi-value">${val}</div></div>`
+                ).join('');
+                let sourceTxt = risqueScore.mdd_source === 'manuel'
+                    ? `Max Drawdown utilisé pour ce diagnostic : celui que vous avez saisi (${risqueScore.mdd_utilise_pct}%).`
+                    : `Max Drawdown utilisé pour ce diagnostic : celui estimé par XTRUNN à partir des trades clôturés (${risqueScore.mdd_utilise_pct}%).`;
+                if (risqueScore.duree_dd_jours !== null && risqueScore.duree_dd_jours !== undefined) {
+                    sourceTxt += ` Plus long temps sous l'eau observé : ${risqueScore.duree_dd_jours} jours.`;
+                    if (risqueScore.duree_dd_toujours_en_cours) {
+                        sourceTxt += ` Ce temps sous l'eau n'était pas encore terminé à la fin de l'historique testé — le vrai pire cas pourrait être plus long.`;
+                    }
+                }
+                document.getElementById('diagRisqueMddSourceTxt').textContent = sourceTxt;
+                genererChecklist(rob.warnings, 'checklistRisque', 'risque', 'alerte');
+                genererChecklist(rob.warnings, 'recommandationsRisque', 'risque', 'recommandation');
+            } else {
+                panneauRisque.style.display = 'none';
+            }
+
+            const scoreCombineTxt = document.getElementById('scoreCombineTxt');
+            if (data.score_combine_geometrique !== null && data.score_combine_geometrique !== undefined) {
+                scoreCombineTxt.style.display = 'block';
+                scoreCombineTxt.innerHTML = `Score Combiné (repère secondaire, moyenne géométrique des scores disponibles) : <strong>${data.score_combine_geometrique}/100</strong>`;
+            } else {
+                scoreCombineTxt.style.display = 'none';
             }
 
             // Doit rester synchronisé avec SEUIL_SCORE_VALIDATION côté
@@ -4176,8 +4221,9 @@
             document.getElementById('p4TotalVal').textContent = data.oos.profit_net + ' ' + deviseSymbole;
             document.getElementById('p4Interpretation').textContent = interpreterConcentration(rob.concentration_pct, rob.top_n_trades);
 
-            // 5. Alertes
-            genererChecklist(rob.warnings);
+            // 5. Alertes -- Robustesse, séparées en alertes et recommandations
+            genererChecklist(rob.warnings, 'checklistContent', 'robustesse', 'alerte');
+            genererChecklist(rob.warnings, 'recommandationsRobustesse', 'robustesse', 'recommandation');
 
             // 6. Graphiques + tableau walk-forward
             tracerGraphiqueGlobal(data.global.curve, data.capital_initial, data.global.trades);
@@ -4582,24 +4628,32 @@
             pilier4: 'Concentration', stresspro: 'Stress Pro', diagnostics: 'Diagnostic',
         };
 
-        function genererChecklist(warnings) {
-            // Les alertes arrivent désormais structurées : { level: "critical" | "warning" | "ok", message: "...", pilier: "..." }
-            // Triées ici par gravité -- un vrai plan d'action, pas un ordre
-            // arbitraire -- et cliquables quand un pilier de destination
-            // est connu, pour aller directement corriger le bon endroit.
-            const container = document.getElementById('checklistContent');
-            const iconByLevel = { critical: '⚠', warning: '⚠', ok: '✓' };
-            const classByLevel = { critical: 'negative', warning: 'warning', ok: 'positive' };
-            const poidsNiveau = { critical: 0, warning: 1, ok: 2 };
+        function genererChecklist(warnings, conteneurId, diagnosticFiltre, typeFiltre) {
+            // Les alertes arrivent désormais structurées : { level, message, diagnostic, type }
+            // diagnosticFiltre : "robustesse" | "qualite" | "risque" | null (toutes)
+            // typeFiltre : "alerte" | "recommandation" | null (les deux)
+            const container = document.getElementById(conteneurId || 'checklistContent');
+            const iconByLevel = { critical: '⚠', warning: '⚠', info: 'ⓘ', ok: '✓' };
+            const classByLevel = { critical: 'negative', warning: 'warning', info: 'warning', ok: 'positive' };
+            const poidsNiveau = { critical: 0, warning: 1, info: 2, ok: 3 };
 
-            const triees = [...warnings].sort((a, b) => (poidsNiveau[a.level] ?? 1) - (poidsNiveau[b.level] ?? 1));
+            let filtrees = warnings;
+            if (diagnosticFiltre) filtrees = filtrees.filter(w => (w.diagnostic || 'robustesse') === diagnosticFiltre || (diagnosticFiltre === 'robustesse' && w.diagnostic === 'donnees'));
+            if (typeFiltre) filtrees = filtrees.filter(w => (w.type || 'alerte') === typeFiltre);
+
+            const triees = [...filtrees].sort((a, b) => (poidsNiveau[a.level] ?? 1) - (poidsNiveau[b.level] ?? 1));
+
+            if (triees.length === 0) {
+                container.innerHTML = `<p style="color:var(--text-muted); font-size:0.78rem;">${typeFiltre === 'recommandation' ? 'Aucune recommandation pour ce diagnostic.' : 'Aucune alerte pour ce diagnostic.'}</p>`;
+                return;
+            }
 
             container.innerHTML = triees.map(w => {
                 const level = w.level || 'warning';
                 const icon = iconByLevel[level] || '⚠';
                 const cls = classByLevel[level] || 'warning';
-                const estCliquable = !!w.pilier && level !== 'ok';
                 const nomPilier = NOMS_PILIERS[w.pilier] || '';
+                const estCliquable = !!w.pilier && level !== 'ok';
                 return `
                     <div class="check-item${estCliquable ? ' cliquable' : ''}" ${estCliquable ? `onclick="allerAuPilier('${w.pilier}')"` : ''}>
                         <span class="check-icon ${cls}">${icon}</span>
@@ -6614,6 +6668,17 @@
             document.getElementById('orbitScoresGroupe').style.display = 'flex';
         }
 
+        function mettreAJourGrandAnneauGenerique(score, arcId, markerId) {
+            const pct = Math.max(0, Math.min(100, score)) / 100;
+            const offset = RING_CIRCONFERENCE * (1 - pct);
+            const arc = document.getElementById(arcId);
+            arc.style.strokeDasharray = RING_CIRCONFERENCE;
+            arc.style.strokeDashoffset = offset;
+            arc.style.stroke = score >= 70 ? 'var(--horizon)' : (score >= 40 ? 'var(--warning)' : 'var(--danger)');
+            const angle = pct * 360 - 90;
+            document.getElementById(markerId).setAttribute('transform', `rotate(${angle + 90} 84 84)`);
+        }
+
         function mettreAJourAnneauScoreQualite(score) {
             const pct = Math.max(0, Math.min(100, score)) / 100;
             const miniArc = document.getElementById('orbitRingMiniArcQualite');
@@ -8393,11 +8458,18 @@
                 return `  ${nom} : ${is_.toFixed(2)}${suf} (référence) → ${oos.toFixed(2)}${suf} (test)`;
             };
 
-            const alertesTxt = (rob.warnings || [])
-                .filter(w => w.level !== 'ok')
-                .sort((a, b) => (a.level === 'critical' ? 0 : 1) - (b.level === 'critical' ? 0 : 1))
-                .map(w => `  [${w.level === 'critical' ? 'CRITIQUE' : 'ATTENTION'}] ${w.message}`)
-                .join('\n') || '  Aucune alerte active.';
+            const formaterAlertes = (liste) => liste.length
+                ? liste.sort((a, b) => (a.level === 'critical' ? 0 : 1) - (b.level === 'critical' ? 0 : 1))
+                    .map(w => `  [${w.level === 'critical' ? 'CRITIQUE' : 'ATTENTION'}] ${w.message}`).join('\n')
+                : '  Aucune.';
+            const parDiagEtType = (diag, type_) => (rob.warnings || []).filter(w => (w.diagnostic || 'robustesse') === diag && (w.type || 'alerte') === type_);
+
+            const alertesRobustesseTxt = formaterAlertes(parDiagEtType('robustesse', 'alerte').concat(parDiagEtType('donnees', 'alerte')));
+            const recoRobustesseTxt = formaterAlertes(parDiagEtType('robustesse', 'recommandation').concat(parDiagEtType('donnees', 'recommandation')));
+            const alertesQualiteTxt = formaterAlertes(parDiagEtType('qualite', 'alerte'));
+            const recoQualiteTxt = formaterAlertes(parDiagEtType('qualite', 'recommandation'));
+            const alertesRisqueTxt = formaterAlertes(parDiagEtType('risque', 'alerte'));
+            const recoRisqueTxt = formaterAlertes(parDiagEtType('risque', 'recommandation'));
 
             const jourComp = analyserJourSemaine(data.oos.trades);
             const dirComp = analyserDirection(data.oos.trades);
@@ -8460,8 +8532,43 @@ Test de fragilité (retrait aléatoire de 10% des trades) : ${data.stress_pro_bo
 Stress coûts/slippage renforcés : ${data.stress_pro_costs.profitable_under_cost_stress ? 'reste viable' : 'devient déficitaire'}.
 Stabilité temporelle : ${data.stress_pro_rolling.rolling_stable ? 'stable' : 'instable'} (${data.stress_pro_rolling.rolling_profitable_pct}% des blocs rentables).
 
---- ALERTES ACTIVES ---
-${alertesTxt}
+--- ALERTES DE SANTÉ — ROBUSTESSE ---
+${alertesRobustesseTxt}
+
+--- RECOMMANDATIONS — ROBUSTESSE ---
+${recoRobustesseTxt}
+${data.qualite_performance ? `
+
+=== SCORE DE QUALITÉ / PERFORMANCE (${data.qualite_performance.score} / 100) ===
+Diagnostic distinct de la Robustesse : répond à "si ce backtest se reproduit, est-ce que ça vaut la peine d'être tradé ?"
+Profit Factor : ${data.qualite_performance.score_profit_factor} / 40
+Sharpe Ratio : ${data.qualite_performance.score_sharpe ?? 'N/D'} / 30
+Calmar Ratio : ${data.qualite_performance.score_calmar ?? 'N/D'} / 30
+
+--- ALERTES DE SANTÉ — QUALITÉ ---
+${alertesQualiteTxt}
+
+--- RECOMMANDATIONS — QUALITÉ ---
+${recoQualiteTxt}` : ''}
+${data.risque ? `
+
+=== SCORE DE RISQUE (${data.risque.score} / 100) ===
+Diagnostic distinct des deux autres : répond à "peu importe si c'est robuste et rentable, à quel point le pire scénario réaliste fait-il mal ?"
+Max Drawdown : ${data.risque.score_mdd ?? 'N/D'} / 20 (${data.risque.mdd_utilise_pct}%, source : ${data.risque.mdd_source})
+Facteur de récupération : ${data.risque.score_recovery ?? 'N/D'} / 20
+Signaux de risque de ruine : ${data.risque.score_signaux_ruine} / 20
+Viabilité sous stress de coûts : ${data.risque.score_couts ?? 'N/D'} / 15
+Série de pertes consécutives : ${data.risque.score_serie_pertes ?? 'N/D'} / 10
+Durée du drawdown : ${data.risque.score_duree_dd ?? 'N/D'} / 15 (${data.risque.duree_dd_jours ?? 'N/D'} jours${data.risque.duree_dd_toujours_en_cours ? ', toujours en cours à la fin de l\'historique' : ''})
+
+--- ALERTES DE SANTÉ — RISQUE ---
+${alertesRisqueTxt}
+
+--- RECOMMANDATIONS — RISQUE ---
+${recoRisqueTxt}` : ''}
+${(data.score_combine_geometrique !== null && data.score_combine_geometrique !== undefined) ? `
+
+Score Combiné (repère secondaire, moyenne géométrique des scores disponibles) : ${data.score_combine_geometrique} / 100` : ''}
 
 === FIN DU RAPPORT ===`;
 
@@ -8533,13 +8640,24 @@ ${alertesTxt}
 
             const fiabiliteMsg = rob.echantillon_fiable
                 ? `Échantillon jugé statistiquement fiable (${rob.n_trades_oos} trades de test).`
-                : `⚠ Échantillon faible (${rob.n_trades_oos} trades de test) — score plafonné, à interpréter avec prudence.`;
+                : `⚠ Échantillon faible (${rob.n_trades_oos} trades de test) — portée interprétative réduite, à interpréter avec prudence.`;
 
-            const warningsHtml = rob.warnings.map(w => {
-                const icon = w.level === 'ok' ? '✓' : '⚠';
-                const color = w.level === 'critical' ? '#dc2626' : (w.level === 'ok' ? '#059669' : '#d97706');
-                return `<div class="pr-warning-item"><span style="color:${color}; font-weight:700;">${icon}</span><span>${w.message}</span></div>`;
-            }).join('');
+            const formaterWarningsHtml = (liste) => liste.length
+                ? liste.map(w => {
+                    const icon = w.level === 'critical' ? '⚠' : (w.level === 'info' ? 'ⓘ' : '⚠');
+                    const color = w.level === 'critical' ? '#dc2626' : '#d97706';
+                    return `<div class="pr-warning-item"><span style="color:${color}; font-weight:700;">${icon}</span><span>${w.message}</span></div>`;
+                }).join('')
+                : `<div class="pr-warning-item"><span style="color:#059669; font-weight:700;">✓</span><span>Aucune.</span></div>`;
+            const parDiagPdf = (diag, type_) => (rob.warnings || []).filter(w => (w.diagnostic || 'robustesse') === diag && (w.type || 'alerte') === type_);
+            const alertesRobustesseHtml = formaterWarningsHtml(parDiagPdf('robustesse', 'alerte').concat(parDiagPdf('donnees', 'alerte')));
+            const recoRobustesseHtml = formaterWarningsHtml(parDiagPdf('robustesse', 'recommandation').concat(parDiagPdf('donnees', 'recommandation')));
+            const alertesQualiteHtml = formaterWarningsHtml(parDiagPdf('qualite', 'alerte'));
+            const recoQualiteHtml = formaterWarningsHtml(parDiagPdf('qualite', 'recommandation'));
+            const alertesRisqueHtml = formaterWarningsHtml(parDiagPdf('risque', 'alerte'));
+            const recoRisqueHtml = formaterWarningsHtml(parDiagPdf('risque', 'recommandation'));
+            const qualiteD = derniereAnalyse.qualite_performance;
+            const risqueD = derniereAnalyse.risque;
 
             // Capture des graphiques déjà rendus en images (canvas -> PNG base64)
             const equityImg = unifiedChartInstance ? unifiedChartInstance.toBase64Image() : null;
@@ -8599,8 +8717,54 @@ ${alertesTxt}
                 <img class="pr-chart-img" src="${equityImg}" />
                 ` : ''}
 
-                <div class="pr-section-title">Alertes de Santé & Recommandations</div>
-                ${warningsHtml}
+                <div class="pr-section-title">Alertes de Santé — Robustesse</div>
+                ${alertesRobustesseHtml}
+                <div class="pr-section-title">Recommandations — Robustesse</div>
+                ${recoRobustesseHtml}
+                ${qualiteD ? `
+                <div class="pr-score-block">
+                    <div>
+                        <div class="pr-score-label">Score de Qualité / Performance</div>
+                        <div class="pr-score-num">${qualiteD.score} / 100</div>
+                    </div>
+                    <div style="font-size:0.75rem; color:#6b7280; max-width:260px;">Diagnostic distinct de la Robustesse : si ce backtest se reproduit, est-ce que ça vaut la peine d'être tradé ?</div>
+                </div>
+                <table class="pr-pillars">
+                    <tr><th>Axe</th><th>Score</th></tr>
+                    <tr><td>Profit Factor</td><td>${qualiteD.score_profit_factor} / 40</td></tr>
+                    <tr><td>Sharpe Ratio</td><td>${qualiteD.score_sharpe ?? 'N/D'} / 30</td></tr>
+                    <tr><td>Calmar Ratio</td><td>${qualiteD.score_calmar ?? 'N/D'} / 30</td></tr>
+                </table>
+                <div class="pr-section-title">Alertes de Santé — Qualité</div>
+                ${alertesQualiteHtml}
+                <div class="pr-section-title">Recommandations — Qualité</div>
+                ${recoQualiteHtml}
+                ` : ''}
+                ${risqueD ? `
+                <div class="pr-score-block">
+                    <div>
+                        <div class="pr-score-label">Score de Risque</div>
+                        <div class="pr-score-num">${risqueD.score} / 100</div>
+                    </div>
+                    <div style="font-size:0.75rem; color:#6b7280; max-width:260px;">Diagnostic distinct des deux autres : peu importe si c'est robuste et rentable, à quel point le pire scénario réaliste fait-il mal ?</div>
+                </div>
+                <table class="pr-pillars">
+                    <tr><th>Axe</th><th>Score</th></tr>
+                    <tr><td>Max Drawdown (${risqueD.mdd_utilise_pct}%, source : ${risqueD.mdd_source})</td><td>${risqueD.score_mdd ?? 'N/D'} / 20</td></tr>
+                    <tr><td>Facteur de récupération</td><td>${risqueD.score_recovery ?? 'N/D'} / 20</td></tr>
+                    <tr><td>Signaux de risque de ruine</td><td>${risqueD.score_signaux_ruine} / 20</td></tr>
+                    <tr><td>Viabilité sous stress de coûts</td><td>${risqueD.score_couts ?? 'N/D'} / 15</td></tr>
+                    <tr><td>Série de pertes consécutives</td><td>${risqueD.score_serie_pertes ?? 'N/D'} / 10</td></tr>
+                    <tr><td>Durée du drawdown (${risqueD.duree_dd_jours ?? 'N/D'} jours${risqueD.duree_dd_toujours_en_cours ? ', en cours' : ''})</td><td>${risqueD.score_duree_dd ?? 'N/D'} / 15</td></tr>
+                </table>
+                <div class="pr-section-title">Alertes de Santé — Risque</div>
+                ${alertesRisqueHtml}
+                <div class="pr-section-title">Recommandations — Risque</div>
+                ${recoRisqueHtml}
+                ` : ''}
+                ${(derniereAnalyse.score_combine_geometrique !== null && derniereAnalyse.score_combine_geometrique !== undefined) ? `
+                <div style="font-size:0.78rem; color:#6b7280; text-align:center; margin:14px 0;">Score Combiné (repère secondaire, moyenne géométrique des scores disponibles) : <strong>${derniereAnalyse.score_combine_geometrique} / 100</strong></div>
+                ` : ''}
 
                 <div class="pr-footer">
                     Ce score est un outil d'aide à la décision statistique, pas une garantie de résultat futur.
