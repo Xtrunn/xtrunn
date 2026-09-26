@@ -1741,12 +1741,27 @@ def calculer_ratios_performance(trades_array, details_list, capital_initial, cou
 
     capital_courant = capital_initial
     rendements = []
+    equity_history = [capital_initial]
     for profit_jour in par_jour.values:
         if capital_courant <= 0:
             break
         rendements.append(profit_jour / capital_courant)
         capital_courant += profit_jour
+        equity_history.append(capital_courant)
     rendements = np.array(rendements)
+
+    # Ulcer Index (Martin, 1987) : racine carrée de la moyenne des
+    # drawdowns au carré sur toute la courbe d'équity journalière --
+    # combine profondeur ET durée en un seul chiffre, contrairement au
+    # Max Drawdown (profondeur seule) ou à la durée du drawdown (durée
+    # seule) pris séparément. Une stratégie avec de nombreux petits
+    # drawdowns qui traînent en longueur peut sembler correcte sur les
+    # deux axes pris isolément tout en étant réellement pénible à tenir --
+    # l'Ulcer Index capture cette interaction que les deux autres manquent.
+    equity_arr = np.array(equity_history)
+    pic_courant = np.maximum.accumulate(equity_arr)
+    drawdown_pct_serie = np.where(pic_courant > 0, (equity_arr - pic_courant) / pic_courant * 100, 0.0)
+    ulcer_index = float(np.sqrt(np.mean(drawdown_pct_serie ** 2)))
 
     if len(rendements) < MIN_JOURS_ACTIFS_RATIOS or np.std(rendements) == 0:
         return None
@@ -1809,6 +1824,7 @@ def calculer_ratios_performance(trades_array, details_list, capital_initial, cou
         "excess_return_vs_benchmark_pct": excess_return_pct,
         "profit_net_simule": round(profit_net_simule, 2),
         "profit_net_reel_apres_couts": profit_net_reel_apres_couts,
+        "ulcer_index": round(ulcer_index, 2),
     }
 
 
@@ -1831,11 +1847,12 @@ def calculer_ratios_performance(trades_array, details_list, capital_initial, cou
 # comment il a été calculé). Affichés côte à côte, sans hiérarchie.
 # ============================================================
 
-POIDS_QUALITE_PROFIT_FACTOR = 25
-POIDS_QUALITE_SHARPE = 20
-POIDS_QUALITE_SORTINO = 20
-POIDS_QUALITE_CALMAR = 20
+POIDS_QUALITE_PROFIT_FACTOR = 20
+POIDS_QUALITE_SHARPE = 15
+POIDS_QUALITE_SORTINO = 15
+POIDS_QUALITE_CALMAR = 15
 POIDS_QUALITE_BENCHMARK = 15
+POIDS_QUALITE_EXPECTANCY = 20
 # Le plafond de score (PF >= 3.0 -> score plein) reste inchangé -- il
 # correspond à la fourchette "très bon/robuste" citée par plusieurs
 # sources. Mais au-delà de ce seuil-ci, le consensus de ces mêmes sources
@@ -1860,7 +1877,35 @@ def _score_par_paliers(valeur, paliers):
     return paliers[-1][1]
 
 
-def calculer_score_qualite(oos_profit_factor, ratios_performance):
+def calculer_expectancy(trades_array):
+    """
+    Espérance de gain par trade : (Winrate × Gain moyen) − (Loss rate ×
+    Perte moyenne). Distincte du Profit Factor, qui ignore le nombre de
+    trades -- l'espérance donne directement le gain moyen attendu par
+    trade, en valeur absolue. Normalisée en "multiples de R" (espérance ÷
+    perte moyenne) pour rester comparable indépendamment de l'échelle de
+    capital, suivant la convention citée : <0 pas d'edge, 0-0.2 marginal,
+    0.2-0.5 correct, 0.5-1.0 bon, >1.0 excellent.
+    """
+    if len(trades_array) == 0:
+        return None
+    gains = trades_array[trades_array > 0]
+    pertes = trades_array[trades_array < 0]
+    if len(pertes) == 0:
+        return None  # pas de perte observée -- le ratio R n'a pas de sens (division par zéro)
+    winrate = len(gains) / len(trades_array)
+    loss_rate = len(pertes) / len(trades_array)
+    gain_moyen = float(np.mean(gains)) if len(gains) > 0 else 0.0
+    perte_moyenne_abs = float(np.mean(np.abs(pertes)))
+    expectancy = winrate * gain_moyen - loss_rate * perte_moyenne_abs
+    expectancy_r = expectancy / perte_moyenne_abs if perte_moyenne_abs > 0 else None
+    return {
+        "expectancy": round(expectancy, 2),
+        "expectancy_r": round(expectancy_r, 3) if expectancy_r is not None else None,
+    }
+
+
+def calculer_score_qualite(oos_profit_factor, ratios_performance, expectancy_res=None):
     """
     Score 0-100 distinct, jamais mélangé au score de Robustesse. Repose sur
     cinq axes complémentaires : le Profit Factor (marge de profitabilité
@@ -1881,13 +1926,13 @@ def calculer_score_qualite(oos_profit_factor, ratios_performance):
         return None
 
     score_pf = _score_par_paliers(oos_profit_factor, [
-        (1.0, 0), (1.3, 9), (2.0, 19), (3.0, POIDS_QUALITE_PROFIT_FACTOR),
+        (1.0, 0), (1.3, 7), (2.0, 15), (3.0, POIDS_QUALITE_PROFIT_FACTOR),
     ])
 
     sharpe = ratios_performance.get("sharpe_ratio")
     if sharpe is not None:
         score_sharpe = _score_par_paliers(sharpe, [
-            (0.0, 0), (1.0, 10), (2.0, 17), (3.0, POIDS_QUALITE_SHARPE),
+            (0.0, 0), (1.0, 8), (2.0, 13), (3.0, POIDS_QUALITE_SHARPE),
         ])
     else:
         score_sharpe = None
@@ -1899,7 +1944,7 @@ def calculer_score_qualite(oos_profit_factor, ratios_performance):
     sortino = ratios_performance.get("sortino_ratio")
     if sortino is not None:
         score_sortino = _score_par_paliers(sortino, [
-            (0.0, 0), (1.5, 12), (3.0, POIDS_QUALITE_SORTINO),
+            (0.0, 0), (1.5, 9), (3.0, POIDS_QUALITE_SORTINO),
         ])
     else:
         score_sortino = None
@@ -1907,7 +1952,7 @@ def calculer_score_qualite(oos_profit_factor, ratios_performance):
     calmar = ratios_performance.get("calmar_ratio")
     if calmar is not None:
         score_calmar = _score_par_paliers(calmar, [
-            (0.5, 0), (1.0, 7), (3.0, 17), (5.0, POIDS_QUALITE_CALMAR),
+            (0.5, 0), (1.0, 5), (3.0, 13), (5.0, POIDS_QUALITE_CALMAR),
         ])
     else:
         score_calmar = None
@@ -1923,6 +1968,18 @@ def calculer_score_qualite(oos_profit_factor, ratios_performance):
         ])
     else:
         score_benchmark = None
+
+    # Espérance de gain par trade, normalisée en multiples de R (÷ perte
+    # moyenne) : distincte du Profit Factor, qui ignore le nombre de
+    # trades. Seuils issus de la convention citée : <0 pas d'edge, 0-0.2
+    # marginal, 0.2-0.5 correct, 0.5-1.0 bon, >1.0 excellent.
+    expectancy_r = expectancy_res.get("expectancy_r") if expectancy_res else None
+    if expectancy_r is not None:
+        score_expectancy = _score_par_paliers(expectancy_r, [
+            (0.0, 0), (0.2, 6), (0.5, 13), (1.0, POIDS_QUALITE_EXPECTANCY),
+        ])
+    else:
+        score_expectancy = None
 
     # Si un axe manque (rendements journaliers valides mais drawdown nul,
     # ou benchmark non renseigné), on redistribue son poids sur les axes
@@ -1942,6 +1999,9 @@ def calculer_score_qualite(oos_profit_factor, ratios_performance):
     if score_benchmark is not None:
         composantes_actives.append(("benchmark", score_benchmark, POIDS_QUALITE_BENCHMARK))
         poids_total += POIDS_QUALITE_BENCHMARK
+    if score_expectancy is not None:
+        composantes_actives.append(("expectancy", score_expectancy, POIDS_QUALITE_EXPECTANCY))
+        poids_total += POIDS_QUALITE_EXPECTANCY
 
     score_brut = sum(s for _, s, _ in composantes_actives)
     score_final = int(round(score_brut / poids_total * 100)) if poids_total > 0 else 0
@@ -1954,6 +2014,8 @@ def calculer_score_qualite(oos_profit_factor, ratios_performance):
         "score_sortino": round(score_sortino, 1) if score_sortino is not None else None,
         "score_calmar": round(score_calmar, 1) if score_calmar is not None else None,
         "score_benchmark": round(score_benchmark, 1) if score_benchmark is not None else None,
+        "score_expectancy": round(score_expectancy, 1) if score_expectancy is not None else None,
+        "expectancy_r_utilise": expectancy_r,
         "oos_profit_factor_utilise": round(oos_profit_factor, 2),
         "pf_suspicieusement_eleve": bool(oos_profit_factor >= SEUIL_PF_SUSPICIEUSEMENT_ELEVE),
     }
@@ -1981,12 +2043,13 @@ def calculer_score_qualite(oos_profit_factor, ratios_performance):
 #     seule fenêtre walk-forward, contrairement au Pilier 3 de Robustesse)
 # ============================================================
 
-POIDS_RISQUE_MDD = 20
-POIDS_RISQUE_RECOVERY = 20
-POIDS_RISQUE_SIGNAUX_RUINE = 20
-POIDS_RISQUE_COUTS = 15
-POIDS_RISQUE_SERIE_PERTES = 10
-POIDS_RISQUE_DUREE_DD = 15
+POIDS_RISQUE_MDD = 16
+POIDS_RISQUE_RECOVERY = 16
+POIDS_RISQUE_SIGNAUX_RUINE = 16
+POIDS_RISQUE_COUTS = 12
+POIDS_RISQUE_SERIE_PERTES = 8
+POIDS_RISQUE_DUREE_DD = 12
+POIDS_RISQUE_ULCER = 20
 
 
 # ============================================================
@@ -2108,7 +2171,7 @@ def calculer_duree_drawdown(trades_array, details_list, capital_initial):
     }
 
 
-def calculer_score_risque(mdd_pct, mdd_source, stress_recovery_factor, risque_ruine_res, costs_res, max_pertes_consecutives_absolu, duree_drawdown_res=None):
+def calculer_score_risque(mdd_pct, mdd_source, stress_recovery_factor, risque_ruine_res, costs_res, max_pertes_consecutives_absolu, duree_drawdown_res=None, ratios_performance=None):
     """Score 0-100 distinct, jamais mélangé aux deux autres diagnostics."""
     avertissements = []
 
@@ -2119,9 +2182,9 @@ def calculer_score_risque(mdd_pct, mdd_source, stress_recovery_factor, risque_ru
         if mdd_pct <= 10:
             score_mdd = float(POIDS_RISQUE_MDD)
         elif mdd_pct <= 20:
-            score_mdd = POIDS_RISQUE_MDD - (mdd_pct - 10) / 10 * (POIDS_RISQUE_MDD - 15)
+            score_mdd = POIDS_RISQUE_MDD - (mdd_pct - 10) / 10 * (POIDS_RISQUE_MDD - 12)
         elif mdd_pct <= 35:
-            score_mdd = 15 - (mdd_pct - 20) / 15 * 15
+            score_mdd = 12 - (mdd_pct - 20) / 15 * 12
         else:
             score_mdd = 0.0
     else:
@@ -2130,7 +2193,7 @@ def calculer_score_risque(mdd_pct, mdd_source, stress_recovery_factor, risque_ru
     # Axe 2 : facteur de récupération (profit / pire drawdown simulé à 95%)
     if stress_recovery_factor is not None:
         score_recovery = _score_par_paliers(stress_recovery_factor, [
-            (0.0, 0), (1.0, 12), (RECOVERY_FACTOR_CIBLE, POIDS_RISQUE_RECOVERY),
+            (0.0, 0), (1.0, 10), (RECOVERY_FACTOR_CIBLE, POIDS_RISQUE_RECOVERY),
         ])
     else:
         score_recovery = None
@@ -2177,17 +2240,35 @@ def calculer_score_risque(mdd_pct, mdd_source, stress_recovery_factor, risque_ru
         if duree_jours <= 30:
             score_duree = float(POIDS_RISQUE_DUREE_DD)
         elif duree_jours <= 90:
-            score_duree = POIDS_RISQUE_DUREE_DD - (duree_jours - 30) / 60 * (POIDS_RISQUE_DUREE_DD - 10)
+            score_duree = POIDS_RISQUE_DUREE_DD - (duree_jours - 30) / 60 * (POIDS_RISQUE_DUREE_DD - 8)
         elif duree_jours <= 180:
-            score_duree = 10 - (duree_jours - 90) / 90 * 5
+            score_duree = 8 - (duree_jours - 90) / 90 * 4
         elif duree_jours <= 365:
-            score_duree = 5 - (duree_jours - 180) / 185 * 5
+            score_duree = 4 - (duree_jours - 180) / 185 * 4
         else:
             score_duree = 0.0
         if duree_drawdown_res.get("toujours_en_cours_a_la_fin"):
             avertissements.append(f"Le plus long temps sous l'eau ({duree_jours} jours) n'était pas encore terminé à la fin de l'historique testé -- le vrai pire cas pourrait être plus long.")
     else:
         score_duree = None
+
+    # Axe 7 : Ulcer Index (Martin, 1987) -- combine profondeur ET durée du
+    # drawdown en un seul chiffre (racine carrée de la moyenne des
+    # drawdowns au carré sur toute la courbe d'équity), complétant les
+    # axes 1 et 6 pris séparément par leur interaction. Seuils issus de la
+    # convention citée : < 3 excellent, 3-7 bon, 7-14 moyen, > 14 mauvais.
+    ulcer_index = ratios_performance.get("ulcer_index") if ratios_performance else None
+    if ulcer_index is not None:
+        if ulcer_index <= 3:
+            score_ulcer = float(POIDS_RISQUE_ULCER)
+        elif ulcer_index <= 7:
+            score_ulcer = POIDS_RISQUE_ULCER - (ulcer_index - 3) / 4 * (POIDS_RISQUE_ULCER - 12)
+        elif ulcer_index <= 14:
+            score_ulcer = 12 - (ulcer_index - 7) / 7 * 12
+        else:
+            score_ulcer = 0.0
+    else:
+        score_ulcer = None
 
     composantes = [
         ("mdd", score_mdd, POIDS_RISQUE_MDD),
@@ -2196,6 +2277,7 @@ def calculer_score_risque(mdd_pct, mdd_source, stress_recovery_factor, risque_ru
         ("couts", score_couts, POIDS_RISQUE_COUTS),
         ("serie_pertes", score_serie, POIDS_RISQUE_SERIE_PERTES),
         ("duree_dd", score_duree, POIDS_RISQUE_DUREE_DD),
+        ("ulcer", score_ulcer, POIDS_RISQUE_ULCER),
     ]
     composantes_actives = [(nom, s, poids) for nom, s, poids in composantes if s is not None]
     if not composantes_actives:
@@ -2215,6 +2297,8 @@ def calculer_score_risque(mdd_pct, mdd_source, stress_recovery_factor, risque_ru
         "score_duree_dd": round(score_duree, 1) if score_duree is not None else None,
         "duree_dd_jours": duree_jours,
         "duree_dd_toujours_en_cours": bool(duree_drawdown_res.get("toujours_en_cours_a_la_fin")) if duree_drawdown_res else False,
+        "score_ulcer": round(score_ulcer, 1) if score_ulcer is not None else None,
+        "ulcer_index_utilise": ulcer_index,
         "n_signaux_ruine_actifs": n_signaux,
         "mdd_utilise_pct": round(mdd_pct, 2) if mdd_pct is not None else None,
         "mdd_source": mdd_source,
@@ -3685,7 +3769,8 @@ def construire_resultat_analyse(
     # Qualité de 15 ne doivent pas donner l'impression rassurante d'un
     # "52 correct", puisque la Robustesse basse signifie précisément
     # qu'on ne peut pas faire confiance au chiffre de Qualité.
-    qualite_perf_res = calculer_score_qualite(oos_pf, ratios_performance)
+    expectancy_res = calculer_expectancy(oos_trades)
+    qualite_perf_res = calculer_score_qualite(oos_pf, ratios_performance, expectancy_res)
     duree_dd_res = calculer_duree_drawdown(oos_trades, oos_detail, oos_capital_ref)
     risque_res = calculer_score_risque(
         max_equity_drawdown_pct if max_equity_drawdown_pct is not None else stats_oos["mdd_pct"],
@@ -3695,6 +3780,7 @@ def construire_resultat_analyse(
         costs_res,
         stats_oos["max_pertes_consecutives"],
         duree_dd_res,
+        ratios_performance,
     )
     scores_disponibles = [score_global]
     if qualite_perf_res is not None:
