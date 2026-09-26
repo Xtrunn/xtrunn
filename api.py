@@ -5,6 +5,7 @@ import json
 import re
 import math
 import sqlite3
+import httpx
 from datetime import datetime, timezone, timedelta
 import numpy as np
 import pandas as pd
@@ -15,6 +16,16 @@ from pydantic import BaseModel
 import uvicorn
 
 app = FastAPI()
+
+# ============================================================
+# OBSERVATIONS IA -- fonctionnalité opt-in (déclenchée par un bouton,
+# jamais automatique) : un appel API a un coût réel à chaque génération.
+# Nécessite une clé API Anthropic valide dans la variable d'environnement
+# ANTHROPIC_API_KEY pour fonctionner réellement.
+# ============================================================
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
+ANTHROPIC_MODEL = "claude-sonnet-5"  # à réévaluer selon les modèles disponibles au moment du déploiement
+ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
 
 app.add_middleware(
     CORSMiddleware,
@@ -4562,6 +4573,130 @@ async def reinitialiser_donnees():
     conn.commit()
     conn.close()
     return {"ok": True}
+
+
+def construire_prompt_observations(resultat, comportement=None):
+    """
+    Construit le prompt envoyé à l'API pour générer des observations.
+    Rassemble tout ce qui est déjà calculé (scores et leur détail, alertes,
+    forme de la distribution, ventilation par instrument, motifs
+    comportementaux calculés côté client) sans rien résumer -- une IA
+    raisonne mieux avec le contexte complet qu'avec des raccourcis.
+    """
+    rob = resultat.get("robustesse", {})
+    qual = resultat.get("qualite_performance")
+    risq = resultat.get("risque")
+    ratios = resultat.get("ratios_performance")
+    ventilation = resultat.get("ventilation_instruments")
+    stats = resultat.get("global", {}).get("stats", {})
+    alertes = rob.get("warnings", [])
+
+    sections = []
+
+    sections.append(f"""=== SCORES (déjà calculés, ne pas les répéter dans les observations) ===
+Robustesse : {rob.get('score_global')}/100 -- répond à "ce résultat se reproduit-il dans le temps ?"
+Qualité : {qual.get('score') if qual else 'N/D'}/100 -- répond à "si ça se reproduit, est-ce que ça vaut la peine d'être tradé ?"
+Risque : {risq.get('score') if risq else 'N/D'}/100 -- répond à "à quel point le pire scénario réaliste fait-il mal ?\"""")
+
+    sections.append("=== ALERTES ACTIVES ===\n" + "\n".join(
+        f"- [{a.get('diagnostic')}/{a.get('level')}] {a.get('message')}" for a in alertes
+    ) if alertes else "=== ALERTES ACTIVES ===\nAucune.")
+
+    sections.append(f"""=== STATISTIQUES DE BASE (période de test) ===
+Trades : {stats.get('n_trades')}
+Winrate : {stats.get('winrate_pct')}%
+Gain moyen : {stats.get('gain_moyen')} / Perte moyenne : {stats.get('perte_moyenne')}
+Plus grosse perte : {stats.get('plus_grosse_perte')}
+Série de pertes max : {stats.get('max_pertes_consecutives')}""")
+
+    if ratios:
+        sections.append(f"""=== FORME DE LA DISTRIBUTION ET RATIOS ===
+Sharpe : {ratios.get('sharpe_ratio')} / Sortino : {ratios.get('sortino_ratio')} / Calmar : {ratios.get('calmar_ratio')}
+Ulcer Index : {ratios.get('ulcer_index')}
+Asymétrie (skew) : {rob.get('ruine_skew')} / Aplatissement (kurtosis) : {rob.get('ruine_kurtosis_exces')}""")
+
+    if ventilation and ventilation.get("n_instruments", 0) > 1:
+        lignes = "\n".join(f"- {v['symbole']} : {v['n_trades']} trades, {v['pct_profit_total']}% du profit total" for v in ventilation["ventilation"])
+        sections.append(f"=== VENTILATION PAR INSTRUMENT ===\n{lignes}")
+
+    if comportement:
+        sections.append(f"=== MOTIFS COMPORTEMENTAUX (calculés sur l'historique de trades) ===\n{json.dumps(comportement, ensure_ascii=False, indent=2)}")
+
+    corps = "\n\n".join(sections)
+
+    return f"""Tu es un analyste quantitatif qui examine le rapport d'audit d'une stratégie de trading algorithmique, déjà scorée par un moteur de robustesse statistique. Voici les données complètes de cette analyse :
+
+{corps}
+
+Ta tâche : identifie 3 à 6 observations concrètes et spécifiques sur cette stratégie, strictement basées sur les données ci-dessus. Pour chaque observation, donne un titre court, l'observation elle-même ancrée dans un chiffre précis des données fournies (jamais une généralité vague type "attention au risque"), et si pertinent, ce qu'il faudrait vérifier dans le code de la stratégie ou dans des données supplémentaires pour confirmer ou infirmer cette hypothèse.
+
+Contraintes importantes :
+- Ne répète jamais les scores ou alertes déjà donnés tels quels -- synthétise ou croise plusieurs signaux entre eux.
+- Tu ne vois jamais le code de la stratégie : formule chaque observation comme une hypothèse à vérifier, jamais comme une certitude.
+- Si les données ne permettent vraiment aucune observation utile au-delà de ce qui est déjà dit, dis-le honnêtement plutôt que d'inventer du contenu.
+
+Réponds en JSON strict, sans texte avant ou après, avec cette structure exacte :
+{{"observations": [{{"titre": "...", "texte": "...", "verification_suggeree": "..."}}]}}"""
+
+
+async def appeler_anthropic_observations(resultat, comportement=None):
+    """
+    Logique d'appel partagée entre l'app de bureau et la démo web -- jamais
+    deux implémentations qui pourraient diverger. Retourne le dict
+    d'observations, ou lève une HTTPException explicite.
+    """
+    if not ANTHROPIC_API_KEY:
+        raise HTTPException(status_code=503, detail="Clé API Anthropic non configurée sur le serveur (variable d'environnement ANTHROPIC_API_KEY manquante).")
+
+    prompt = construire_prompt_observations(resultat, comportement)
+
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                ANTHROPIC_API_URL,
+                headers={
+                    "x-api-key": ANTHROPIC_API_KEY,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                json={
+                    "model": ANTHROPIC_MODEL,
+                    "max_tokens": 2000,
+                    "messages": [{"role": "user", "content": prompt}],
+                },
+            )
+            response.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=502, detail=f"Erreur de l'API Anthropic (statut {e.response.status_code}).")
+    except httpx.RequestError:
+        raise HTTPException(status_code=502, detail="Erreur réseau lors de l'appel à l'API Anthropic.")
+
+    data = response.json()
+    texte_reponse = "".join(
+        bloc.get("text", "") for bloc in data.get("content", []) if bloc.get("type") == "text"
+    )
+
+    texte_nettoye = re.sub(r"^```(?:json)?\s*|\s*```$", "", texte_reponse.strip())
+    try:
+        return json.loads(texte_nettoye)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=502, detail="Réponse de l'IA dans un format inattendu, impossible à afficher.")
+
+
+class ObservationsRequest(BaseModel):
+    resultat: dict
+    comportement: dict | None = None
+
+
+@app.post("/generer-observations")
+async def generer_observations(payload: ObservationsRequest):
+    """
+    Génère des observations en langage naturel à partir de tout ce qui est
+    déjà calculé -- opt-in (déclenché par un bouton côté interface), un
+    appel a un coût réel. Toujours présenté comme des hypothèses à
+    vérifier, jamais avec la même confiance que les scores sourcés.
+    """
+    return await appeler_anthropic_observations(payload.resultat, payload.comportement)
 
 
 @app.get("/strategies")
