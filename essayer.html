@@ -2591,6 +2591,7 @@
                         </div>
 
                         <div id="scoreBadge" style="font-size:0.8rem; font-weight:700;">--</div>
+                        <div id="scorePointCle" style="font-size:0.78rem; color:var(--text-muted); line-height:1.4; margin-top:8px;"></div>
                         <div id="reliabilityBadge" style="display:none;"></div>
                         <div id="periodeContexteNote" style="display:none; font-size:0.74rem; color:var(--text-muted); line-height:1.5; margin-top:10px; padding-top:10px; border-top:1px solid var(--ash);"></div>
 
@@ -2657,6 +2658,7 @@
                         </div>
 
                         <div id="qualiteBadge" style="font-size:0.8rem; font-weight:700;">--</div>
+                        <div id="qualitePointCle" style="font-size:0.78rem; color:var(--text-muted); line-height:1.4; margin-top:8px;"></div>
                         <div id="qualiteNote" style="font-size:0.74rem; color:var(--text-muted); line-height:1.5; margin-top:10px; padding-top:10px; border-top:1px solid var(--ash);"></div>
 
                         <div class="collapsible" style="margin-top:18px; text-align:left;">
@@ -2700,6 +2702,7 @@
                         </div>
 
                         <div id="risqueBadge" style="font-size:0.8rem; font-weight:700;">--</div>
+                        <div id="risquePointCle" style="font-size:0.78rem; color:var(--text-muted); line-height:1.4; margin-top:8px;"></div>
                         <div id="risqueNote" style="font-size:0.74rem; color:var(--text-muted); line-height:1.5; margin-top:10px; padding-top:10px; border-top:1px solid var(--ash);"></div>
 
                         <div class="collapsible" style="margin-top:18px; text-align:left;">
@@ -3981,6 +3984,10 @@
                 if (qualite.score >= 70) { qBadge.textContent = 'BONNE QUALITÉ'; qBadge.className = 'positive'; }
                 else if (qualite.score >= 40) { qBadge.textContent = 'QUALITÉ MOYENNE'; qBadge.className = 'warning'; }
                 else { qBadge.textContent = 'QUALITÉ FAIBLE'; qBadge.className = 'negative'; }
+                const pcQual = obtenirPointCle(rob.warnings, 'qualite');
+                document.getElementById('qualitePointCle').textContent = pcQual.texte
+                    ? `Point à retenir : ${pcQual.texte}${pcQual.total > 1 ? ` (+ ${pcQual.total - 1} autre${pcQual.total > 2 ? 's' : ''} point${pcQual.total > 2 ? 's' : ''} plus bas)` : ''}`
+                    : "Rien d'alarmant à signaler ici.";
                 document.getElementById('qualiteNote').textContent = "Ce score s'appuie sur les données fournies. S'il a servi de base au réglage de la stratégie, seul un suivi en direct sur des données nouvelles confirme une vraie qualité future.";
 
                 const cartesQ = [
@@ -4023,6 +4030,10 @@
                 if (risqueScore.score >= 70) { rBadge.textContent = 'RISQUE MAÎTRISÉ'; rBadge.className = 'positive'; }
                 else if (risqueScore.score >= 40) { rBadge.textContent = 'RISQUE MODÉRÉ'; rBadge.className = 'warning'; }
                 else { rBadge.textContent = 'RISQUE ÉLEVÉ'; rBadge.className = 'negative'; }
+                const pcRisq = obtenirPointCle(rob.warnings, 'risque');
+                document.getElementById('risquePointCle').textContent = pcRisq.texte
+                    ? `Point à retenir : ${pcRisq.texte}${pcRisq.total > 1 ? ` (+ ${pcRisq.total - 1} autre${pcRisq.total > 2 ? 's' : ''} point${pcRisq.total > 2 ? 's' : ''} plus bas)` : ''}`
+                    : "Rien d'alarmant à signaler ici.";
                 document.getElementById('risqueNote').textContent = "Ce score s'appuie sur les données fournies. S'il a servi de base au réglage de la stratégie, seul un suivi en direct sur des données nouvelles confirme un vrai niveau de risque futur.";
 
                 const cartes = [
@@ -4141,6 +4152,10 @@
             } else {
                 badge.textContent = "SCORE CRITIQUE"; badge.className = "negative";
             }
+            const pcRob = obtenirPointCle(rob.warnings, 'robustesse');
+            document.getElementById('scorePointCle').textContent = pcRob.texte
+                ? `Point à retenir : ${pcRob.texte}${pcRob.total > 1 ? ` (+ ${pcRob.total - 1} autre${pcRob.total > 2 ? 's' : ''} point${pcRob.total > 2 ? 's' : ''} plus bas)` : ''}`
+                : "Rien d'alarmant à signaler ici.";
 
             // Badge de fiabilité de l'échantillon — affiché seulement si pertinent,
             // pour que le score reste lisible d'un coup d'oeil mais jamais trompeur.
@@ -4361,6 +4376,19 @@
         // phrase qui parle des chiffres réels de CETTE stratégie, plutôt
         // que de répéter la méthode générique déjà expliquée plus bas.
         // ============================================================
+        function obtenirPointCle(warnings, diagnosticFiltre) {
+            const poidsNiveau = { critical: 0, warning: 1, info: 2 };
+            const alertes = warnings.filter(w =>
+                (w.type || 'alerte') === 'alerte' &&
+                ((w.diagnostic || 'robustesse') === diagnosticFiltre || (diagnosticFiltre === 'robustesse' && w.diagnostic === 'donnees'))
+            );
+            if (alertes.length === 0) return { texte: null, niveau: null };
+            const triees = [...alertes].sort((a, b) => (poidsNiveau[a.level] ?? 1) - (poidsNiveau[b.level] ?? 1));
+            const top = triees[0];
+            const texteAllege = top.message.replace(/\s*\([^()]*\d[^()]*\)/g, '').trim();
+            return { texte: texteAllege, niveau: top.level, total: alertes.length };
+        }
+
         function categoriser(valeur, seuils, inverse) {
             if (valeur === null || valeur === undefined || isNaN(valeur)) return null;
             if (!inverse) {
