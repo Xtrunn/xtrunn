@@ -2677,6 +2677,7 @@
                             <div class="collapsible-content" style="padding:0 16px;">
                                 <div class="stats-detail-grid" id="diagQualiteDetailGrid" style="margin-top:8px;"></div>
                                 <p id="diagQualitePfAlerteTxt" style="display:none; font-size:0.76rem; color:var(--warning); margin:14px 0 0; padding:10px 12px; background:rgba(201,166,99,0.08); border:1px solid rgba(201,166,99,0.25); border-radius:8px;"></p>
+                                <p id="diagQualiteExpectancyTxt" style="font-size:0.72rem; color:var(--text-muted); margin:12px 0 0;"></p>
                             </div>
                         </div>
                     </div>
@@ -3983,11 +3984,12 @@
                 document.getElementById('qualiteNote').textContent = "Ce score s'appuie sur les données fournies. S'il a servi de base au réglage de la stratégie, seul un suivi en direct sur des données nouvelles confirme une vraie qualité future.";
 
                 const cartesQ = [
-                    ['Profit Factor', `${qualite.score_profit_factor}/25`],
-                    ['Sharpe Ratio', qualite.score_sharpe !== null ? `${qualite.score_sharpe}/20` : 'N/D'],
-                    ['Sortino Ratio', qualite.score_sortino !== null ? `${qualite.score_sortino}/20` : 'N/D'],
-                    ['Calmar Ratio', qualite.score_calmar !== null ? `${qualite.score_calmar}/20` : 'N/D'],
+                    ['Profit Factor', `${qualite.score_profit_factor}/20`],
+                    ['Sharpe Ratio', qualite.score_sharpe !== null ? `${qualite.score_sharpe}/15` : 'N/D'],
+                    ['Sortino Ratio', qualite.score_sortino !== null ? `${qualite.score_sortino}/15` : 'N/D'],
+                    ['Calmar Ratio', qualite.score_calmar !== null ? `${qualite.score_calmar}/15` : 'N/D'],
                     ['Vs Benchmark', qualite.score_benchmark !== null ? `${qualite.score_benchmark}/15` : 'N/D (non renseigné)'],
+                    ['Espérance de Gain', qualite.score_expectancy !== null ? `${qualite.score_expectancy}/20` : 'N/D'],
                 ];
                 document.getElementById('diagQualiteDetailGrid').innerHTML = cartesQ.map(([titre, val]) =>
                     `<div class="kpi-card"><div class="kpi-label">${titre}</div><div class="kpi-value">${val}</div></div>`
@@ -3998,6 +4000,12 @@
                     alerteTxt.textContent = `Profit Factor inhabituellement élevé (${qualite.oos_profit_factor_utilise}) : au-delà de ce niveau, plusieurs sources spécialisées considèrent qu'un Profit Factor aussi élevé est lui-même un signal à vérifier (surapprentissage probable ou échantillon trop petit), plutôt qu'un signe de qualité supplémentaire. Le score de Qualité ne baisse pas pour cette seule raison -- c'est le rôle du diagnostic de Robustesse -- mais ce chiffre mérite d'être confirmé sur un historique plus long.`;
                 } else {
                     alerteTxt.style.display = 'none';
+                }
+                const expTxt = document.getElementById('diagQualiteExpectancyTxt');
+                if (qualite.expectancy_r_utilise !== null && qualite.expectancy_r_utilise !== undefined) {
+                    expTxt.textContent = `Espérance de gain : ${qualite.expectancy_r_utilise}R par trade (repère : < 0 pas d'edge, 0-0.2 marginal, 0.2-0.5 correct, 0.5-1.0 bon, > 1.0 excellent).`;
+                } else {
+                    expTxt.textContent = '';
                 }
                 genererChecklist(rob.warnings, 'checklistQualite', 'qualite', 'alerte');
                 genererChecklist(rob.warnings, 'recommandationsQualite', 'qualite', 'recommandation');
@@ -4018,12 +4026,13 @@
                 document.getElementById('risqueNote').textContent = "Ce score s'appuie sur les données fournies. S'il a servi de base au réglage de la stratégie, seul un suivi en direct sur des données nouvelles confirme un vrai niveau de risque futur.";
 
                 const cartes = [
-                    ['Max Drawdown', risqueScore.score_mdd !== null ? `${risqueScore.score_mdd}/20` : 'N/D'],
-                    ['Facteur de Récupération', risqueScore.score_recovery !== null ? `${risqueScore.score_recovery}/20` : 'N/D'],
-                    ['Signaux de Risque de Ruine', `${risqueScore.score_signaux_ruine}/20`],
-                    ['Viabilité sous Stress de Coûts', risqueScore.score_couts !== null ? `${risqueScore.score_couts}/15` : 'N/D'],
-                    ['Série de Pertes Consécutives', risqueScore.score_serie_pertes !== null ? `${risqueScore.score_serie_pertes}/10` : 'N/D'],
-                    ['Durée du Drawdown', risqueScore.score_duree_dd !== null ? `${risqueScore.score_duree_dd}/15` : 'N/D'],
+                    ['Max Drawdown', risqueScore.score_mdd !== null ? `${risqueScore.score_mdd}/16` : 'N/D'],
+                    ['Facteur de Récupération', risqueScore.score_recovery !== null ? `${risqueScore.score_recovery}/16` : 'N/D'],
+                    ['Signaux de Risque de Ruine', `${risqueScore.score_signaux_ruine}/16`],
+                    ['Viabilité sous Stress de Coûts', risqueScore.score_couts !== null ? `${risqueScore.score_couts}/12` : 'N/D'],
+                    ['Série de Pertes Consécutives', risqueScore.score_serie_pertes !== null ? `${risqueScore.score_serie_pertes}/8` : 'N/D'],
+                    ['Durée du Drawdown', risqueScore.score_duree_dd !== null ? `${risqueScore.score_duree_dd}/12` : 'N/D'],
+                    ['Ulcer Index', risqueScore.score_ulcer !== null ? `${risqueScore.score_ulcer}/20` : 'N/D'],
                 ];
                 document.getElementById('diagRisqueDetailGrid').innerHTML = cartes.map(([titre, val]) =>
                     `<div class="kpi-card"><div class="kpi-label">${titre}</div><div class="kpi-value">${val}</div></div>`
@@ -4036,6 +4045,9 @@
                     if (risqueScore.duree_dd_toujours_en_cours) {
                         sourceTxt += ` Ce temps sous l'eau n'était pas encore terminé à la fin de l'historique testé — le vrai pire cas pourrait être plus long.`;
                     }
+                }
+                if (risqueScore.ulcer_index_utilise !== null && risqueScore.ulcer_index_utilise !== undefined) {
+                    sourceTxt += ` Ulcer Index : ${risqueScore.ulcer_index_utilise} (repère : < 3 excellent, 3-7 bon, 7-14 moyen, > 14 mauvais).`;
                 }
                 document.getElementById('diagRisqueMddSourceTxt').textContent = sourceTxt;
                 genererChecklist(rob.warnings, 'checklistRisque', 'risque', 'alerte');
@@ -8457,11 +8469,12 @@ ${data.qualite_performance ? `
 
 === SCORE DE QUALITÉ / PERFORMANCE (${data.qualite_performance.score} / 100) ===
 Diagnostic distinct de la Robustesse : répond à "si ce backtest se reproduit, est-ce que ça vaut la peine d'être tradé ?"
-Profit Factor : ${data.qualite_performance.score_profit_factor} / 25
-Sharpe Ratio : ${data.qualite_performance.score_sharpe ?? 'N/D'} / 20
-Sortino Ratio : ${data.qualite_performance.score_sortino ?? 'N/D'} / 20
-Calmar Ratio : ${data.qualite_performance.score_calmar ?? 'N/D'} / 20
+Profit Factor : ${data.qualite_performance.score_profit_factor} / 20
+Sharpe Ratio : ${data.qualite_performance.score_sharpe ?? 'N/D'} / 15
+Sortino Ratio : ${data.qualite_performance.score_sortino ?? 'N/D'} / 15
+Calmar Ratio : ${data.qualite_performance.score_calmar ?? 'N/D'} / 15
 Vs Benchmark : ${data.qualite_performance.score_benchmark ?? 'N/D (non renseigné)'} / 15
+Espérance de Gain : ${data.qualite_performance.score_expectancy ?? 'N/D'} / 20 (${data.qualite_performance.expectancy_r_utilise ?? 'N/D'}R par trade)
 
 --- ALERTES DE SANTÉ — QUALITÉ ---
 ${alertesQualiteTxt}
@@ -8472,12 +8485,13 @@ ${data.risque ? `
 
 === SCORE DE RISQUE (${data.risque.score} / 100) ===
 Diagnostic distinct des deux autres : répond à "peu importe si c'est robuste et rentable, à quel point le pire scénario réaliste fait-il mal ?"
-Max Drawdown : ${data.risque.score_mdd ?? 'N/D'} / 20 (${data.risque.mdd_utilise_pct}%, source : ${data.risque.mdd_source})
-Facteur de récupération : ${data.risque.score_recovery ?? 'N/D'} / 20
-Signaux de risque de ruine : ${data.risque.score_signaux_ruine} / 20
-Viabilité sous stress de coûts : ${data.risque.score_couts ?? 'N/D'} / 15
-Série de pertes consécutives : ${data.risque.score_serie_pertes ?? 'N/D'} / 10
-Durée du drawdown : ${data.risque.score_duree_dd ?? 'N/D'} / 15 (${data.risque.duree_dd_jours ?? 'N/D'} jours${data.risque.duree_dd_toujours_en_cours ? ', toujours en cours à la fin de l\'historique' : ''})
+Max Drawdown : ${data.risque.score_mdd ?? 'N/D'} / 16 (${data.risque.mdd_utilise_pct}%, source : ${data.risque.mdd_source})
+Facteur de récupération : ${data.risque.score_recovery ?? 'N/D'} / 16
+Signaux de risque de ruine : ${data.risque.score_signaux_ruine} / 16
+Viabilité sous stress de coûts : ${data.risque.score_couts ?? 'N/D'} / 12
+Série de pertes consécutives : ${data.risque.score_serie_pertes ?? 'N/D'} / 8
+Durée du drawdown : ${data.risque.score_duree_dd ?? 'N/D'} / 12 (${data.risque.duree_dd_jours ?? 'N/D'} jours${data.risque.duree_dd_toujours_en_cours ? ', toujours en cours à la fin de l\'historique' : ''})
+Ulcer Index : ${data.risque.score_ulcer ?? 'N/D'} / 20 (valeur : ${data.risque.ulcer_index_utilise ?? 'N/D'}, repère : < 3 excellent, 3-7 bon, 7-14 moyen, > 14 mauvais)
 
 --- ALERTES DE SANTÉ — RISQUE ---
 ${alertesRisqueTxt}
@@ -8651,11 +8665,12 @@ Score Combiné (repère secondaire, moyenne géométrique des scores disponibles
                 </div>
                 <table class="pr-pillars">
                     <tr><th>Axe</th><th>Score</th></tr>
-                    <tr><td>Profit Factor</td><td>${qualiteD.score_profit_factor} / 25</td></tr>
-                    <tr><td>Sharpe Ratio</td><td>${qualiteD.score_sharpe ?? 'N/D'} / 20</td></tr>
-                    <tr><td>Sortino Ratio</td><td>${qualiteD.score_sortino ?? 'N/D'} / 20</td></tr>
-                    <tr><td>Calmar Ratio</td><td>${qualiteD.score_calmar ?? 'N/D'} / 20</td></tr>
+                    <tr><td>Profit Factor</td><td>${qualiteD.score_profit_factor} / 20</td></tr>
+                    <tr><td>Sharpe Ratio</td><td>${qualiteD.score_sharpe ?? 'N/D'} / 15</td></tr>
+                    <tr><td>Sortino Ratio</td><td>${qualiteD.score_sortino ?? 'N/D'} / 15</td></tr>
+                    <tr><td>Calmar Ratio</td><td>${qualiteD.score_calmar ?? 'N/D'} / 15</td></tr>
                     <tr><td>Vs Benchmark</td><td>${qualiteD.score_benchmark ?? 'N/D (non renseigné)'} / 15</td></tr>
+                    <tr><td>Espérance de Gain (${qualiteD.expectancy_r_utilise ?? 'N/D'}R)</td><td>${qualiteD.score_expectancy ?? 'N/D'} / 20</td></tr>
                 </table>
                 <div class="pr-section-title">Alertes de Santé — Qualité</div>
                 ${alertesQualiteHtml}
@@ -8672,12 +8687,13 @@ Score Combiné (repère secondaire, moyenne géométrique des scores disponibles
                 </div>
                 <table class="pr-pillars">
                     <tr><th>Axe</th><th>Score</th></tr>
-                    <tr><td>Max Drawdown (${risqueD.mdd_utilise_pct}%, source : ${risqueD.mdd_source})</td><td>${risqueD.score_mdd ?? 'N/D'} / 20</td></tr>
-                    <tr><td>Facteur de récupération</td><td>${risqueD.score_recovery ?? 'N/D'} / 20</td></tr>
-                    <tr><td>Signaux de risque de ruine</td><td>${risqueD.score_signaux_ruine} / 20</td></tr>
-                    <tr><td>Viabilité sous stress de coûts</td><td>${risqueD.score_couts ?? 'N/D'} / 15</td></tr>
-                    <tr><td>Série de pertes consécutives</td><td>${risqueD.score_serie_pertes ?? 'N/D'} / 10</td></tr>
-                    <tr><td>Durée du drawdown (${risqueD.duree_dd_jours ?? 'N/D'} jours${risqueD.duree_dd_toujours_en_cours ? ', en cours' : ''})</td><td>${risqueD.score_duree_dd ?? 'N/D'} / 15</td></tr>
+                    <tr><td>Max Drawdown (${risqueD.mdd_utilise_pct}%, source : ${risqueD.mdd_source})</td><td>${risqueD.score_mdd ?? 'N/D'} / 16</td></tr>
+                    <tr><td>Facteur de récupération</td><td>${risqueD.score_recovery ?? 'N/D'} / 16</td></tr>
+                    <tr><td>Signaux de risque de ruine</td><td>${risqueD.score_signaux_ruine} / 16</td></tr>
+                    <tr><td>Viabilité sous stress de coûts</td><td>${risqueD.score_couts ?? 'N/D'} / 12</td></tr>
+                    <tr><td>Série de pertes consécutives</td><td>${risqueD.score_serie_pertes ?? 'N/D'} / 8</td></tr>
+                    <tr><td>Durée du drawdown (${risqueD.duree_dd_jours ?? 'N/D'} jours${risqueD.duree_dd_toujours_en_cours ? ', en cours' : ''})</td><td>${risqueD.score_duree_dd ?? 'N/D'} / 12</td></tr>
+                    <tr><td>Ulcer Index (${risqueD.ulcer_index_utilise ?? 'N/D'})</td><td>${risqueD.score_ulcer ?? 'N/D'} / 20</td></tr>
                 </table>
                 <div class="pr-section-title">Alertes de Santé — Risque</div>
                 ${alertesRisqueHtml}
