@@ -27,10 +27,12 @@ from fastapi.responses import HTMLResponse
 
 from api import (
     construire_resultat_analyse,
+    appeler_anthropic_observations,
     N_WINDOWS_DEFAULT,
     IS_RATIO_DEFAULT,
     PROTOCOLE_STANDARD_DUREE_JOURS,
 )
+from pydantic import BaseModel
 from datetime import datetime, timezone, timedelta
 
 # ============================================================
@@ -45,7 +47,13 @@ from datetime import datetime, timezone, timedelta
 RATE_LIMIT_MAX = 8            # analyses maximum...
 RATE_LIMIT_WINDOW_S = 3600    # ...par heure glissante, par IP
 
+# Observations IA : coût réel par appel (LLM), plafond plus strict que les
+# analyses elles-mêmes pour contenir les coûts sur la démo publique.
+RATE_LIMIT_OBS_MAX = 3
+RATE_LIMIT_OBS_WINDOW_S = 3600
+
 _appels_par_ip: dict[str, list[float]] = defaultdict(list)
+_appels_obs_par_ip: dict[str, list[float]] = defaultdict(list)
 _verrou = threading.Lock()
 
 
@@ -55,6 +63,17 @@ def _ip_autorisee(ip: str) -> bool:
         appels = _appels_par_ip[ip]
         appels[:] = [t for t in appels if maintenant - t < RATE_LIMIT_WINDOW_S]
         if len(appels) >= RATE_LIMIT_MAX:
+            return False
+        appels.append(maintenant)
+        return True
+
+
+def _ip_autorisee_observations(ip: str) -> bool:
+    maintenant = time.time()
+    with _verrou:
+        appels = _appels_obs_par_ip[ip]
+        appels[:] = [t for t in appels if maintenant - t < RATE_LIMIT_OBS_WINDOW_S]
+        if len(appels) >= RATE_LIMIT_OBS_MAX:
             return False
         appels.append(maintenant)
         return True
@@ -131,6 +150,25 @@ async def demo_analyser(
         resultat["strategie_id"] = None
 
     return resultat
+
+
+class ObservationsRequestDemo(BaseModel):
+    resultat: dict
+    comportement: dict | None = None
+
+
+@app.post("/generer-observations")
+async def demo_generer_observations(payload: ObservationsRequestDemo, request: Request):
+    ip = request.client.host if request.client else "inconnue"
+    if not _ip_autorisee_observations(ip):
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                f"Limite de la démo atteinte ({RATE_LIMIT_OBS_MAX} générations d'observations par heure maximum). "
+                "Réessayez plus tard, ou téléchargez l'application de bureau."
+            ),
+        )
+    return await appeler_anthropic_observations(payload.resultat, payload.comportement)
 
 
 if __name__ == "__main__":
