@@ -1601,6 +1601,13 @@
         }
         .check-item-chevron { flex-shrink: 0; color: var(--text-muted); font-size: 0.85rem; align-self: center; }
         .check-item:last-child { border-bottom: none; }
+        .check-item-detail-technique { color: var(--text-muted); font-size: 0.85em; }
+        .check-item-voir-plus {
+            display: block; width: 100%; margin-top: 10px; padding: 8px; text-align: center;
+            background: none; border: 1px dashed var(--border-silver); border-radius: 8px;
+            color: var(--text-muted); font-size: 0.76rem; cursor: pointer;
+        }
+        .check-item-voir-plus:hover { color: var(--silver-bright); border-color: var(--silver-bright); }
         .check-icon { font-size: 1rem; font-weight: bold; }
 
         .reliability-badge {
@@ -4614,6 +4621,7 @@
             const iconByLevel = { critical: '⚠', warning: '⚠', info: 'ⓘ', ok: '✓' };
             const classByLevel = { critical: 'negative', warning: 'warning', info: 'warning', ok: 'positive' };
             const poidsNiveau = { critical: 0, warning: 1, info: 2, ok: 3 };
+            const NB_VISIBLES_PAR_DEFAUT = 3;
 
             let filtrees = warnings;
             if (diagnosticFiltre) filtrees = filtrees.filter(w => (w.diagnostic || 'robustesse') === diagnosticFiltre || (diagnosticFiltre === 'robustesse' && w.diagnostic === 'donnees'));
@@ -4626,7 +4634,12 @@
                 return;
             }
 
-            container.innerHTML = triees.map(w => {
+            // Le détail technique entre parenthèses reste disponible mais
+            // en retrait visuel -- la phrase en clair doit se lire d'un
+            // coup d'œil, le chiffre exact reste à portée pour qui le veut.
+            const allegerMessage = (msg) => msg.replace(/\(([^()]*\d[^()]*)\)/g, '<span class="check-item-detail-technique">($1)</span>');
+
+            const rendreItem = (w) => {
                 const level = w.level || 'warning';
                 const icon = iconByLevel[level] || '⚠';
                 const cls = classByLevel[level] || 'warning';
@@ -4636,13 +4649,29 @@
                     <div class="check-item${estCliquable ? ' cliquable' : ''}" ${estCliquable ? `onclick="allerAuPilier('${w.pilier}')"` : ''}>
                         <span class="check-icon ${cls}">${icon}</span>
                         <div class="check-item-corps">
-                            <span style="font-size:0.8rem; line-height:1.4;">${w.message}</span>
+                            <span style="font-size:0.8rem; line-height:1.4;">${allegerMessage(w.message)}</span>
                             ${estCliquable ? `<div class="check-item-pilier">${nomPilier} →</div>` : ''}
                         </div>
                         ${estCliquable ? '<span class="check-item-chevron">›</span>' : ''}
                     </div>
                 `;
-            }).join('');
+            };
+
+            const visibles = triees.slice(0, NB_VISIBLES_PAR_DEFAUT);
+            const masquees = triees.slice(NB_VISIBLES_PAR_DEFAUT);
+
+            let html = visibles.map(rendreItem).join('');
+            if (masquees.length > 0) {
+                const idMasque = `${conteneurId}-masque-${Math.random().toString(36).slice(2, 8)}`;
+                html += `
+                    <div id="${idMasque}" style="display:none;">${masquees.map(rendreItem).join('')}</div>
+                    <button class="check-item-voir-plus" onclick="
+                        this.previousElementSibling.style.display='block';
+                        this.style.display='none';
+                    ">Voir ${masquees.length} de plus ↓</button>
+                `;
+            }
+            container.innerHTML = html;
         }
 
         function extraireDateBrute(dateStr) {
