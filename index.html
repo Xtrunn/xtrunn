@@ -2027,7 +2027,7 @@
         <div class="rail-divider"></div>
         <button class="sub-tab" onclick="changerSousOnglet('isoos', this)"><span class="rail-icon">◐</span><span class="rail-label">1 · Stabilité</span></button>
         <button class="sub-tab" onclick="changerSousOnglet('montecarlo', this)"><span class="rail-icon">✷</span><span class="rail-label">2 · Monte Carlo</span></button>
-        <button class="sub-tab" onclick="changerSousOnglet('pilier3', this)"><span class="rail-icon">⚠</span><span class="rail-label">3 · Risque & Drawdown</span></button>
+        <button class="sub-tab" onclick="changerSousOnglet('pilier3', this)"><span class="rail-icon">◇</span><span class="rail-label">3 · Fragilité</span></button>
         <button class="sub-tab" onclick="changerSousOnglet('pilier4', this)"><span class="rail-icon">◆</span><span class="rail-label">4 · Concentration</span></button>
         <div class="rail-divider"></div>
         <button class="sub-tab" onclick="changerSousOnglet('stresspro', this)"><span class="rail-icon">⚡</span><span class="rail-label">Stress Pro</span></button>
@@ -2229,7 +2229,7 @@
                     <div class="pillar-header" style="margin-bottom:0;">
                         <div class="pillar-header-badge">P1</div>
                         <div class="pillar-header-info">
-                            <div class="pillar-header-title">Stabilité Référence → Test <span class="pillar-header-score" id="p2ScoreDisplay">-- / 30</span></div>
+                            <div class="pillar-header-title">Stabilité Référence → Test <span class="pillar-header-score" id="p2ScoreDisplay">-- / 25</span></div>
                             <p class="pillar-header-desc">Votre historique complet est découpé automatiquement en plusieurs fenêtres walk-forward consécutives (Référence → Test). Le score se base sur la <strong>médiane</strong> du ratio de stabilité (efficacité Test ÷ efficacité Référence) sur toutes les fenêtres — un seul découpage serait un échantillon de taille 1 au niveau des régimes de marché ; plusieurs fenêtres donnent une vraie mesure de consistance dans le temps. Une pénalité s'ajoute si trop de fenêtres individuelles sont de mauvaise qualité, même quand la médiane est correcte.</p>
                             <div class="pillar-header-metrics">
                                 <div><span>Ratio de Stabilité Médian</span><b id="p2StabilityRatio">--</b></div>
@@ -2283,10 +2283,10 @@
                     <div class="pillar-header" style="margin-bottom:0;">
                         <div class="pillar-header-badge">P2</div>
                         <div class="pillar-header-info">
-                            <div class="pillar-header-title">Sensibilité de Trajectoire <span class="pillar-header-score" id="p1ScoreDisplay">-- / 30</span></div>
+                            <div class="pillar-header-title">Sensibilité de Trajectoire <span class="pillar-header-score" id="p1ScoreDisplay">-- / 25</span></div>
                             <p class="pillar-header-desc">Réordonner des trades ne change jamais leur somme — seul le chemin parcouru (et donc le drawdown) varie. Ce pilier note uniquement si le drawdown réel a eu de la "chance" dans son enchaînement. Le facteur de récupération (le profit justifie-t-il l'ampleur du risque) est noté séparément, dans le diagnostic Risque.</p>
                             <div class="pillar-header-metrics">
-                                <div><span>Score Sensibilité</span><b id="p1ScorePath">-- / 30</b></div>
+                                <div><span>Score Sensibilité</span><b id="p1ScorePath">-- / 25</b></div>
                             </div>
                         </div>
                     </div>
@@ -2311,7 +2311,7 @@
                     </div>
                     <div class="mc-info-card">
                         <div class="mc-info-title">Score du Pilier</div>
-                        <div class="mc-info-val" id="mcScore">-- / 30</div>
+                        <div class="mc-info-val" id="mcScore">-- / 25</div>
                     </div>
                 </div>
 
@@ -2358,31 +2358,31 @@
                     <div class="pillar-header" style="margin-bottom:0;">
                         <div class="pillar-header-badge">P3</div>
                         <div class="pillar-header-info">
-                            <div class="pillar-header-title">Risque & Drawdown <span class="pillar-header-score" id="p3ScoreDisplay">-- / 20</span></div>
-                            <p class="pillar-header-desc">Évalue si le profit généré justifie le risque encouru (ratio profit ÷ Max Drawdown), et détecte les séries de pertes consécutives qui pourraient être difficiles à tenir psychologiquement en compte réel — un backtest ne montre jamais ce que ça fait de vivre 8 pertes d'affilée.</p>
+                            <div class="pillar-header-title">Fragilité à l'Échantillon <span class="pillar-header-score" id="p3ScoreDisplay">-- / 20</span></div>
+                            <p class="pillar-header-desc">Retire aléatoirement 10% des trades, des milliers de fois, et mesure quelle proportion des tirages reste rentable. Une vraie question de robustesse : ce résultat dépend-il de quelques trades précis, ou tient-il même quand on en retire une partie au hasard ? Un edge réel et répétable devrait survivre au retrait de n'importe quel sous-ensemble de trades.</p>
                         </div>
                     </div>
                 </div>
             </div>
 
             <div class="panel">
-                <div class="panel-title">Ratio Profit / Risque</div>
+                <div class="panel-title">Test de Fragilité (Bootstrap)</div>
                 <div class="metric-row-4">
                     <div class="mc-info-card">
-                        <div class="mc-info-title">Ratio Profit ÷ Max DD <span class="info-tip" data-tip="Profit net Test divisé par le Max Drawdown Test. ≥ 1.0 = le profit dépasse la pire chute traversée. < 0.5 = signal de risque élevé (-12 pts). Entre 0.5 et 1.0 = pénalité modérée (-6 pts).">?</span></div>
-                        <div class="mc-info-val" id="p3RatioVal">--</div>
+                        <div class="mc-info-title">% de Tirages Rentables <span class="info-tip" data-tip="Sur des milliers de tirages retirant 10% des trades au hasard, quel pourcentage reste rentable. ≥ 90% = score plein (20 pts). Sous 50% = 0 pt.">?</span></div>
+                        <div class="mc-info-val" id="p3ProbVal">--</div>
                     </div>
                     <div class="mc-info-card">
-                        <div class="mc-info-title">Série de Pertes Max <span class="info-tip" data-tip="Le plus grand nombre de trades perdants d'affilée sur la période de Test. ≥ 8 = série noire critique (-8 pts). Entre 5 et 7 = série notable (-4 pts).">?</span></div>
-                        <div class="mc-info-val" id="p3StreakVal">--</div>
+                        <div class="mc-info-title">Profit Médian (Tirages)</div>
+                        <div class="mc-info-val" id="p3MedianVal">--</div>
                     </div>
                     <div class="mc-info-card">
-                        <div class="mc-info-title">Profit Net Test</div>
-                        <div class="mc-info-val" id="p3ProfitVal">--</div>
+                        <div class="mc-info-title">Pire Profit (5e Percentile)</div>
+                        <div class="mc-info-val" id="p3WorstProfitVal">--</div>
                     </div>
                     <div class="mc-info-card">
-                        <div class="mc-info-title">Max Drawdown Test</div>
-                        <div class="mc-info-val negative" id="p3MddVal">--</div>
+                        <div class="mc-info-title">Pire Drawdown Simulé</div>
+                        <div class="mc-info-val negative" id="p3WorstMddVal">--</div>
                     </div>
                 </div>
 
@@ -2397,7 +2397,7 @@
 
                 <div class="method-note">
                     <span class="method-note-icon">◈</span>
-                    <p>Ce pilier part de 20 points et retire des pénalités : un ratio profit/DD faible signale que la stratégie prend plus de risque qu'elle ne rapporte ; une longue série de pertes consécutives signale un risque psychologique — le backtest ne dit rien sur votre capacité réelle à tenir une telle séquence sans couper la stratégie au pire moment.</p>
+                    <p>Ce pilier note directement le pourcentage de tirages restés rentables. Un score bas signifie que le résultat repose sur la présence de trades précis dans l'échantillon -- si un edge est réel, il doit survivre au retrait d'une partie quelconque des trades qui l'ont produit.</p>
                 </div>
             </div>
 
@@ -2437,7 +2437,7 @@
                     <div class="pillar-header" style="margin-bottom:0;">
                         <div class="pillar-header-badge">P4</div>
                         <div class="pillar-header-info">
-                            <div class="pillar-header-title">Concentration des Profits <span class="pillar-header-score" id="p4ScoreDisplay">-- / 20</span></div>
+                            <div class="pillar-header-title">Concentration des Profits <span class="pillar-header-score" id="p4ScoreDisplay">-- / 15</span></div>
                             <p class="pillar-header-desc">Détecte l'effet "loterie" : une stratégie dont le profit total dépend de quelques trades exceptionnels n'a pas démontré un edge répétable — elle a peut-être simplement eu de la chance sur 1 ou 2 opérations. Un profit bien réparti sur l'ensemble des trades gagnants est un bien meilleur signal.</p>
                         </div>
                     </div>
@@ -2517,7 +2517,7 @@
                         <div class="stress-card-head">
                             <span class="stress-card-icon">◐</span>
                             <div>
-                                <div class="stress-card-title">Test de Fragilité <span class="info-tip" data-tip="Retire 10% des trades au hasard (1000 fois) et regarde si la stratégie reste rentable. Teste si le résultat dépend de quelques trades précis plutôt que d'un edge réel.">?</span></div>
+                                <div class="stress-card-title">Pilier 3 : Test de Fragilité <span class="pillar-header-score" id="p3ScoreDisplayStressPro">-- / 20</span> <span class="info-tip" data-tip="Retire 10% des trades au hasard (1000 fois) et regarde si la stratégie reste rentable. Teste si le résultat dépend de quelques trades précis plutôt que d'un edge réel -- compte dans le score de Robustesse.">?</span></div>
                                 <div class="stress-card-sub">Drop 10% des trades, 1000 tirages</div>
                             </div>
                         </div>
@@ -2548,7 +2548,7 @@
                         <div class="stress-card-head">
                             <span class="stress-card-icon">◎</span>
                             <div>
-                                <div class="stress-card-title">Découpe Temporelle <span class="info-tip" data-tip="Découpe le Test agrégé (toutes fenêtres walk-forward confondues) en 5 blocs chronologiques indépendants, et vérifie que la stratégie n'est pas profitable seulement pendant un bloc précis (régime de marché favorable). Sans lien avec le nombre de fenêtres walk-forward choisi ci-dessus — un test complémentaire distinct.">?</span></div>
+                                <div class="stress-card-title">Pilier 5 : Stabilité Temporelle <span class="pillar-header-score" id="p5ScoreDisplay">-- / 15</span> <span class="info-tip" data-tip="Découpe le Test agrégé (toutes fenêtres walk-forward confondues) en 5 blocs chronologiques indépendants, et vérifie que la stratégie n'est pas profitable seulement pendant un bloc précis (régime de marché favorable). Sans lien avec le nombre de fenêtres walk-forward choisi ci-dessus — un test complémentaire distinct, qui compte désormais dans le score de Robustesse.">?</span></div>
                                 <div class="stress-card-sub">5 blocs chronologiques fixes (indépendant du walk-forward)</div>
                             </div>
                         </div>
@@ -2609,7 +2609,7 @@
 
                         <div class="collapsible" style="margin-top:18px; text-align:left;">
                             <button class="collapsible-header" onclick="toggleCollapsible(this)" style="padding:12px 16px; font-size:0.74rem;">
-                                <span>Détail du calcul & des 4 piliers</span>
+                                <span>Détail du calcul & des 5 piliers</span>
                                 <span class="collapsible-chevron">▾</span>
                             </button>
                             <div class="collapsible-content" style="padding:0 16px;">
@@ -2617,20 +2617,24 @@
                                 <div class="score-chain" id="scoreChainBox" style="margin-top:12px; display:none;"></div>
 
                                 <div class="subscore-item clickable" style="margin-top:16px;" onclick="allerAuPilier('isoos')">
-                                    <div class="subscore-header"><span>Pilier 1 : Stabilité Référence → Test <span class="info-tip" data-tip="Compare l'efficacité (profit/risque) entre les périodes de référence et les périodes de test qui les suivent, sur plusieurs fenêtres walk-forward (30 pts).">?</span></span><span id="scoreIsoosVal">0/30</span></div>
+                                    <div class="subscore-header"><span>Pilier 1 : Stabilité Référence → Test <span class="info-tip" data-tip="Compare l'efficacité (profit/risque) entre les périodes de référence et les périodes de test qui les suivent, sur plusieurs fenêtres walk-forward (25 pts).">?</span></span><span id="scoreIsoosVal">0/25</span></div>
                                     <div class="progress-bar"><div class="progress-fill" id="barIsoos"></div></div>
                                 </div>
                                 <div class="subscore-item clickable" onclick="allerAuPilier('montecarlo')">
-                                    <div class="subscore-header"><span>Pilier 2 : Stress Monte Carlo <span class="info-tip" data-tip="Note la sensibilité du drawdown à l'ordre des trades et le facteur de récupération sous le pire scénario simulé (30 pts).">?</span></span><span id="scoreMcVal">0/30</span></div>
+                                    <div class="subscore-header"><span>Pilier 2 : Stress Monte Carlo <span class="info-tip" data-tip="Note la sensibilité du drawdown à l'ordre des trades (25 pts).">?</span></span><span id="scoreMcVal">0/25</span></div>
                                     <div class="progress-bar"><div class="progress-fill" id="barMc"></div></div>
                                 </div>
                                 <div class="subscore-item clickable" onclick="allerAuPilier('pilier3')">
-                                    <div class="subscore-header"><span>Pilier 3 : Risque & Drawdown <span class="info-tip" data-tip="Évalue le ratio profit/drawdown et les séries de pertes consécutives sur la période de Test (20 pts).">?</span></span><span id="scoreDdVal">0/20</span></div>
-                                    <div class="progress-bar"><div class="progress-fill" id="barDd"></div></div>
+                                    <div class="subscore-header"><span>Pilier 3 : Fragilité à l'Échantillon <span class="info-tip" data-tip="Retire aléatoirement 10% des trades, des milliers de fois, et note le pourcentage de tirages qui restent rentables (20 pts).">?</span></span><span id="scoreFragiliteVal">0/20</span></div>
+                                    <div class="progress-bar"><div class="progress-fill" id="barFragilite"></div></div>
                                 </div>
                                 <div class="subscore-item clickable" onclick="allerAuPilier('pilier4')">
-                                    <div class="subscore-header"><span>Pilier 4 : Concentration Profits <span class="info-tip" data-tip="Détecte l'effet loterie : si le top 10% des trades génère plus de 50-70% du profit total, la stratégie dépend de quelques coups plutôt que d'un edge répété (20 pts).">?</span></span><span id="scoreConcVal">0/20</span></div>
+                                    <div class="subscore-header"><span>Pilier 4 : Concentration Profits <span class="info-tip" data-tip="Détecte l'effet loterie : si le top 10% des trades génère plus de 50-70% du profit total, la stratégie dépend de quelques coups plutôt que d'un edge répété (15 pts).">?</span></span><span id="scoreConcVal">0/15</span></div>
                                     <div class="progress-bar"><div class="progress-fill" id="barConc"></div></div>
+                                </div>
+                                <div class="subscore-item clickable" onclick="allerAuPilier('stresspro')">
+                                    <div class="subscore-header"><span>Pilier 5 : Stabilité Temporelle <span class="info-tip" data-tip="Découpe l'historique de test en fenêtres qui se chevauchent et note le pourcentage individuellement rentable -- absent du calcul si l'historique est trop court pour ce test précis, poids alors redistribué sur les autres piliers (15 pts).">?</span></span><span id="scoreStabTempVal">0/15</span></div>
+                                    <div class="progress-bar"><div class="progress-fill" id="barStabTemp"></div></div>
                                 </div>
                             </div>
                         </div>
@@ -3930,10 +3934,11 @@
                 recEl.className = "mc-info-val " + (mc.stress_recovery_factor >= 3.0 ? "positive" : (mc.stress_recovery_factor <= 0 ? "negative" : "warning"));
             }
 
-            document.getElementById('mcScore').textContent = mc.score_path + " / 30";
+            document.getElementById('mcScore').textContent = mc.score_path + " / 25";
 
             // 3. Stress Pro
             const bp = data.stress_pro_bootstrap;
+            document.getElementById('p3ScoreDisplayStressPro').textContent = `${data.robustesse.score_fragilite !== null && data.robustesse.score_fragilite !== undefined ? data.robustesse.score_fragilite : 'N/D'} / 20`;
             document.getElementById('bootProb').textContent = bp.bootstrap_prob_positif + " %";
             document.getElementById('bootProb').className = "kpi-value " + (bp.bootstrap_prob_positif >= 60 ? "positive" : "negative");
             document.getElementById('bootMedian').textContent = bp.bootstrap_mediane_profit + " " + deviseSymbole + " (" + (bp.bootstrap_mediane_profit_pct >= 0 ? '+' : '') + bp.bootstrap_mediane_profit_pct + "%)";
@@ -3953,6 +3958,7 @@
             viableEl.className = "kpi-value " + (cp.profitable_under_cost_stress ? "positive" : "negative");
 
             const rp = data.stress_pro_rolling;
+            document.getElementById('p5ScoreDisplay').textContent = (data.robustesse.score_stabilite_temporelle !== null && data.robustesse.score_stabilite_temporelle !== undefined) ? `${data.robustesse.score_stabilite_temporelle} / 15` : 'N/D';
             document.getElementById('rollingPct').textContent = rp.rolling_profitable_pct + " %";
             document.getElementById('rollingPct').className = "kpi-value " + (rp.rolling_profitable_pct >= 60 ? "positive" : "negative");
             document.getElementById('rollingMin').textContent = rp.rolling_min_window_profit + " " + deviseSymbole + " (" + (rp.rolling_min_window_profit_pct >= 0 ? '+' : '') + rp.rolling_min_window_profit_pct + "%)";
@@ -4166,26 +4172,29 @@
                 relBadge.textContent = `ÉCHANTILLON FIABLE (${rob.n_trades_oos} trades)`;
             }
 
-            document.getElementById('scoreMcVal').textContent = `${rob.score_monte_carlo}/30`;
-            document.getElementById('barMc').style.width = `${(rob.score_monte_carlo/30)*100}%`;
+            document.getElementById('scoreMcVal').textContent = `${rob.score_monte_carlo}/25`;
+            document.getElementById('barMc').style.width = `${(rob.score_monte_carlo/25)*100}%`;
 
-            document.getElementById('scoreIsoosVal').textContent = `${rob.score_stabilite_is_oos}/30`;
-            document.getElementById('barIsoos').style.width = `${(rob.score_stabilite_is_oos/30)*100}%`;
+            document.getElementById('scoreIsoosVal').textContent = `${rob.score_stabilite_is_oos}/25`;
+            document.getElementById('barIsoos').style.width = `${(rob.score_stabilite_is_oos/25)*100}%`;
 
-            document.getElementById('scoreDdVal').textContent = `${rob.score_risque_drawdown}/20`;
-            document.getElementById('barDd').style.width = `${(rob.score_risque_drawdown/20)*100}%`;
+            document.getElementById('scoreFragiliteVal').textContent = (rob.score_fragilite !== null && rob.score_fragilite !== undefined) ? `${rob.score_fragilite}/20` : 'N/D';
+            document.getElementById('barFragilite').style.width = (rob.score_fragilite !== null && rob.score_fragilite !== undefined) ? `${(rob.score_fragilite/20)*100}%` : '0%';
 
-            document.getElementById('scoreConcVal').textContent = `${rob.score_concentration}/20`;
-            document.getElementById('barConc').style.width = `${(rob.score_concentration/20)*100}%`;
+            document.getElementById('scoreConcVal').textContent = `${rob.score_concentration}/15`;
+            document.getElementById('barConc').style.width = `${(rob.score_concentration/15)*100}%`;
+
+            document.getElementById('scoreStabTempVal').textContent = (rob.score_stabilite_temporelle !== null && rob.score_stabilite_temporelle !== undefined) ? `${rob.score_stabilite_temporelle}/15` : 'N/D (historique trop court)';
+            document.getElementById('barStabTemp').style.width = (rob.score_stabilite_temporelle !== null && rob.score_stabilite_temporelle !== undefined) ? `${(rob.score_stabilite_temporelle/15)*100}%` : '0%';
 
             // 4bis. En-têtes des 4 onglets de piliers — mêmes chiffres que le
             // Diagnostic, mais mis en contexte directement là où on regarde
             // le détail de chaque pilier.
-            document.getElementById('p1ScoreDisplay').textContent = `${rob.score_monte_carlo} / 30`;
-            document.getElementById('p1ScorePath').textContent = `${mc.score_path} / 30`;
+            document.getElementById('p1ScoreDisplay').textContent = `${rob.score_monte_carlo} / 25`;
+            document.getElementById('p1ScorePath').textContent = `${mc.score_path} / 25`;
             document.getElementById('mcInterpretation').textContent = interpreterMonteCarlo(mc.stress_recovery_factor, mc.path_sensitivity_ratio, mc.plancher_absolu_applique);
 
-            document.getElementById('p2ScoreDisplay').textContent = `${rob.score_stabilite_is_oos} / 30`;
+            document.getElementById('p2ScoreDisplay').textContent = `${rob.score_stabilite_is_oos} / 25`;
             document.getElementById('p2StabilityRatio').textContent = rob.stability_ratio;
             document.getElementById('p2OosPf').textContent = rob.oos_profit_factor;
             document.getElementById('p2FenetresFaibles').textContent = rob.fenetres_faibles_pct + ' %';
@@ -4193,15 +4202,16 @@
             rendreComparaisonRefTest(data.is.stats, data.oos.stats);
             rendreAnalyseComportementale(data.oos.trades);
 
-            document.getElementById('p3ScoreDisplay').textContent = `${rob.score_risque_drawdown} / 20`;
-            document.getElementById('p3RatioVal').textContent = (rob.profit_to_dd_ratio !== null && rob.profit_to_dd_ratio !== undefined) ? rob.profit_to_dd_ratio : 'N/A';
-            document.getElementById('p3StreakVal').textContent = rob.max_losing_streak;
-            document.getElementById('p3ProfitVal').textContent = data.oos.profit_net + ' ' + deviseSymbole;
-            document.getElementById('p3ProfitVal').className = 'mc-info-val ' + (data.oos.profit_net >= 0 ? 'positive' : 'negative');
-            document.getElementById('p3MddVal').textContent = '-' + Math.abs(data.oos.mdd).toFixed(2) + ' ' + deviseSymbole;
-            document.getElementById('p3Interpretation').textContent = interpreterRisqueDrawdown(rob.profit_to_dd_ratio, rob.max_losing_streak);
+            document.getElementById('p3ScoreDisplay').textContent = `${rob.score_fragilite !== null && rob.score_fragilite !== undefined ? rob.score_fragilite : 'N/D'} / 20`;
+            const fr = data.stress_pro_bootstrap;
+            document.getElementById('p3ProbVal').textContent = fr.bootstrap_prob_positif + ' %';
+            document.getElementById('p3MedianVal').textContent = fr.bootstrap_mediane_profit + ' ' + deviseSymbole + ' (' + (fr.bootstrap_mediane_profit_pct >= 0 ? '+' : '') + fr.bootstrap_mediane_profit_pct + '%)';
+            document.getElementById('p3WorstProfitVal').textContent = fr.bootstrap_pire_profit_5pct + ' ' + deviseSymbole + ' (' + (fr.bootstrap_pire_profit_5pct_pct >= 0 ? '+' : '') + fr.bootstrap_pire_profit_5pct_pct + '%)';
+            document.getElementById('p3WorstProfitVal').className = 'mc-info-val ' + (fr.bootstrap_pire_profit_5pct >= 0 ? 'positive' : 'negative');
+            document.getElementById('p3WorstMddVal').textContent = '-' + Math.abs(fr.bootstrap_pire_mdd).toFixed(2) + ' ' + deviseSymbole + ' (' + Math.abs(fr.bootstrap_pire_mdd_pct) + '%)';
+            document.getElementById('p3Interpretation').textContent = interpreterFragilite(fr.bootstrap_prob_positif);
 
-            document.getElementById('p4ScoreDisplay').textContent = `${rob.score_concentration} / 20`;
+            document.getElementById('p4ScoreDisplay').textContent = `${rob.score_concentration} / 15`;
             document.getElementById('p4ConcVal').textContent = rob.concentration_pct + ' %';
             document.getElementById('p4TopNVal').textContent = rob.top_n_trades + ' trades';
             document.getElementById('p4TopSumVal').textContent = rob.top_gains_sum + ' ' + deviseSymbole;
@@ -4395,18 +4405,17 @@
             el.innerHTML = html;
         }
 
-        function interpreterRisqueDrawdown(ratio, streak) {
-            const cat = categoriser(ratio, [0.5, 1.0, 3.0]);
+        function interpreterFragilite(probPositif) {
+            const cat = categoriser(probPositif, [50, 70, 90]);
             rendreJaugeRepere('p3Jauge', cat);
-            if (ratio === null || ratio === undefined) return "Drawdown nul sur la période de test : impossible de calculer un ratio profit/risque, ce qui est en soi un signal très positif.";
-            const streakTxt = streak >= 5 ? ` En revanche, la série de ${streak} pertes d'affilée reste un point de vigilance psychologique pour tenir la stratégie en compte réel.` : '';
+            if (probPositif === null || probPositif === undefined) return "Impossible de calculer le test de fragilité (échantillon trop petit pour le retrait aléatoire de trades).";
             const phrases = [
-                `Avec un ratio de ${ratio}, la plus grosse chute du compte dépasse le profit généré sur la période de test — le risque pris ne semble pas justifié par le gain obtenu.`,
-                `Avec un ratio de ${ratio}, le profit couvre son propre risque, mais de justesse — une marge de sécurité plus large donnerait plus de latitude en compte réel.`,
-                `Avec un ratio de ${ratio}, chaque unité de risque maximal encouru a rapporté ${ratio} fois plus en profit sur la période de test — un rapport profit/risque sain.`,
-                `Avec un ratio de ${ratio}, le profit dépasse très largement le pire risque encouru sur la période de test — un rapport profit/risque solide.`,
+                `Seulement ${probPositif}% des tirages (retrait aléatoire de 10% des trades) restent rentables — le résultat semble dépendre de la présence de trades précis plutôt que d'un avantage réel et répétable.`,
+                `${probPositif}% des tirages restent rentables — une majorité, mais pas encore une marge confortable face au retrait aléatoire d'une partie des trades.`,
+                `${probPositif}% des tirages restent rentables malgré le retrait aléatoire de 10% des trades — un edge qui tient bien face à l'échantillon.`,
+                `${probPositif}% des tirages restent rentables même après retrait aléatoire de 10% des trades — un edge qui ne dépend pas de quelques trades précis.`,
             ];
-            return phrases[cat] + streakTxt;
+            return phrases[cat];
         }
 
         function interpreterConcentration(pct, topN) {
@@ -8480,27 +8489,29 @@ Méthode : découpage walk-forward en fenêtres consécutives (référence → t
 
 --- SCORE GLOBAL : ${rob.score_global} / 100 ---
 
---- PILIER 1 — STABILITÉ RÉFÉRENCE → TEST (${rob.score_stabilite_is_oos} / 30) ---
+--- PILIER 1 — STABILITÉ RÉFÉRENCE → TEST (${rob.score_stabilite_is_oos} / 25) ---
 ${interpreterStabilite(rob.stability_ratio, rob.fenetres_faibles_pct)}
 Ratio de stabilité médian : ${rob.stability_ratio}
 Profit Factor Test (toutes fenêtres) : ${rob.oos_profit_factor}
 Fenêtres faibles (< 0.5) : ${rob.fenetres_faibles_pct}%
 
---- PILIER 2 — SENSIBILITÉ DE TRAJECTOIRE / MONTE CARLO (${mc.score_path} / 30) ---
+--- PILIER 2 — SENSIBILITÉ DE TRAJECTOIRE / MONTE CARLO (${mc.score_path} / 25) ---
 ${interpreterMonteCarlo(mc.stress_recovery_factor, mc.path_sensitivity_ratio, mc.plancher_absolu_applique)}
 Pire Max DD simulé (95%) : -${Math.abs(mc.pire_mdd_95).toFixed(2)} ${d}
 Sensibilité du drawdown : ${mc.path_sensitivity_ratio !== null ? mc.path_sensitivity_ratio.toFixed(2) + 'x' : 'N/A'}
 Facteur de récupération : ${mc.stress_recovery_factor !== null ? mc.stress_recovery_factor.toFixed(2) : 'N/A'}
 
---- PILIER 3 — RISQUE & DRAWDOWN (${rob.score_risque_drawdown} / 20) ---
-${interpreterRisqueDrawdown(rob.profit_to_dd_ratio, rob.max_losing_streak)}
-Ratio Profit / Max DD : ${rob.profit_to_dd_ratio ?? 'N/A'}
-Série de pertes max : ${rob.max_losing_streak}
+--- PILIER 3 — FRAGILITÉ À L'ÉCHANTILLON (${rob.score_fragilite ?? 'N/D'} / 20) ---
+${interpreterFragilite(data.stress_pro_bootstrap.bootstrap_prob_positif)}
+% de tirages bootstrap rentables : ${data.stress_pro_bootstrap.bootstrap_prob_positif}%
 
---- PILIER 4 — CONCENTRATION (${rob.score_concentration} / 20) ---
+--- PILIER 4 — CONCENTRATION (${rob.score_concentration} / 15) ---
 ${interpreterConcentration(rob.concentration_pct, rob.top_n_trades)}
 Concentration Top 10% : ${rob.concentration_pct}%
 Trades concernés : ${rob.top_n_trades}
+
+--- PILIER 5 — STABILITÉ TEMPORELLE (${rob.score_stabilite_temporelle ?? 'N/D (historique trop court)'} / 15) ---
+${data.stress_pro_rolling.rolling_insuffisant ? "Historique insuffisant pour ce test -- aucune conclusion tirée, poids redistribué sur les autres piliers." : `${data.stress_pro_rolling.rolling_profitable_pct}% des fenêtres rolling sont individuellement rentables.`}
 
 --- COMPARAISON RÉFÉRENCE ↔ TEST (chiffre par chiffre) ---
 ${ligneComparaison('Nombre de trades', data.is.stats.n_trades, data.oos.stats.n_trades, '')}
@@ -8695,10 +8706,11 @@ Score Combiné (repère secondaire, moyenne géométrique des scores disponibles
                 <div class="pr-section-title">Détail des 4 Piliers</div>
                 <table class="pr-pillars">
                     <tr><th>Pilier</th><th>Score</th></tr>
-                    <tr><td>1. Stabilité Référence → Test (médiane walk-forward)</td><td>${rob.score_stabilite_is_oos} / 30</td></tr>
-                    <tr><td>2. Stress Monte Carlo (sensibilité de trajectoire)</td><td>${rob.score_monte_carlo} / 30</td></tr>
-                    <tr><td>3. Risque & Drawdown</td><td>${rob.score_risque_drawdown} / 20</td></tr>
-                    <tr><td>4. Concentration des Profits</td><td>${rob.score_concentration} / 20</td></tr>
+                    <tr><td>1. Stabilité Référence → Test (médiane walk-forward)</td><td>${rob.score_stabilite_is_oos} / 25</td></tr>
+                    <tr><td>2. Stress Monte Carlo (sensibilité de trajectoire)</td><td>${rob.score_monte_carlo} / 25</td></tr>
+                    <tr><td>3. Fragilité à l'Échantillon (bootstrap)</td><td>${rob.score_fragilite ?? 'N/D'} / 20</td></tr>
+                    <tr><td>4. Concentration des Profits</td><td>${rob.score_concentration} / 15</td></tr>
+                    <tr><td>5. Stabilité Temporelle (fenêtres rolling)</td><td>${rob.score_stabilite_temporelle ?? 'N/D (historique trop court)'} / 15</td></tr>
                 </table>
 
                 ${equityImg ? `
