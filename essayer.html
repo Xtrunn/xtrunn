@@ -2573,6 +2573,15 @@
             </div>
 
             <div class="panel">
+                <div class="panel-title">Observations <span class="info-tip" data-tip="Généré par IA à partir de tout ce qui est déjà calculé (scores, alertes, distribution, comportement). Des hypothèses à vérifier, jamais des certitudes -- contrairement aux scores ci-dessus, ceci n'est pas sourcé ni testé de la même façon.">?</span></div>
+                <p style="font-size:0.78rem; color:var(--text-muted); margin:8px 0 16px; line-height:1.5;">
+                    Croise les signaux déjà calculés pour repérer des motifs qu'aucun score pris isolément ne fait ressortir. <strong>Des pistes à explorer, pas des certitudes</strong> -- l'IA ne voit jamais le code de la stratégie.
+                </p>
+                <button class="btn-analyser" id="btnGenererObservations" style="width:100%; background:transparent; color:var(--silver-bright); border:1px solid var(--border-silver);" onclick="genererObservationsIA()" disabled>Générer des Observations</button>
+                <div id="observationsZone" style="margin-top:16px;"></div>
+            </div>
+
+            <div class="panel">
                 <div class="panel-title">Diagnostic & Score de Robustesse</div>
                 <div class="diag-grid">
                     <div class="score-box">
@@ -3792,6 +3801,7 @@
             nomStrategieCourante = botName;
             document.getElementById('btnExportPdf').disabled = false;
             document.getElementById('btnCopierRapport').disabled = false;
+            document.getElementById('btnGenererObservations').disabled = false;
             rafraichirListeNoms();
             afficherContexteStrategie(botName, data.capital_initial, data.nom_fichier);
             rafraichirCodeEtFichier(data.id);
@@ -8423,6 +8433,54 @@
         // chiffres) + les textes d'interprétation déjà construits pour
         // l'interface, pour rester cohérent avec ce qui est affiché.
         // ============================================================
+        async function genererObservationsIA() {
+            if (!derniereAnalyse) return;
+            const zone = document.getElementById('observationsZone');
+            const bouton = document.getElementById('btnGenererObservations');
+            bouton.disabled = true;
+            zone.innerHTML = '<p style="color:var(--text-muted); font-size:0.8rem; text-align:center;">Génération en cours…</p>';
+
+            const comportement = {
+                jour_semaine: analyserJourSemaine(derniereAnalyse.oos.trades),
+                direction: analyserDirection(derniereAnalyse.oos.trades),
+                apres_perte: analyserApresPerte(derniereAnalyse.oos.trades),
+                sizing_apres_perte: analyserSizingApresPerte(derniereAnalyse.oos.trades),
+            };
+
+            try {
+                const resp = await fetch('/generer-observations', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ resultat: derniereAnalyse, comportement: comportement }),
+                });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    zone.innerHTML = `<p style="color:var(--danger); font-size:0.8rem;">${err.detail || "Impossible de générer les observations pour le moment."}</p>`;
+                    bouton.disabled = false;
+                    return;
+                }
+                const data = await resp.json();
+                const observations = data.observations || [];
+                if (observations.length === 0) {
+                    zone.innerHTML = '<p style="color:var(--text-muted); font-size:0.8rem;">Aucune observation utile au-delà de ce qui est déjà affiché ci-dessus.</p>';
+                } else {
+                    zone.innerHTML = `
+                        <p style="font-size:0.7rem; color:var(--warning); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;">Hypothèses à vérifier -- pas des certitudes</p>
+                        ${observations.map(o => `
+                            <div style="padding:12px 14px; margin-bottom:10px; background:rgba(255,255,255,0.02); border:1px solid var(--ash); border-radius:8px;">
+                                <div style="font-weight:700; font-size:0.85rem; margin-bottom:4px;">${o.titre || ''}</div>
+                                <div style="font-size:0.8rem; line-height:1.5; color:var(--text-muted);">${o.texte || ''}</div>
+                                ${o.verification_suggeree ? `<div style="font-size:0.74rem; margin-top:8px; padding-top:8px; border-top:1px solid var(--ash); color:var(--silver-bright);">À vérifier : ${o.verification_suggeree}</div>` : ''}
+                            </div>
+                        `).join('')}
+                    `;
+                }
+            } catch (e) {
+                zone.innerHTML = '<p style="color:var(--danger); font-size:0.8rem;">Erreur réseau -- réessayez dans un instant.</p>';
+            }
+            bouton.disabled = false;
+        }
+
         function copierRapportTexte() {
             if (!derniereAnalyse) return;
             const data = derniereAnalyse;
