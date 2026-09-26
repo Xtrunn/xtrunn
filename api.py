@@ -55,14 +55,23 @@ SEUIL_SCORE_VALIDATION = 70  # score_p10 (le pire cas raisonnable du bootstrap, 
                               # pour débloquer l'Épreuve de Validation -- doit rester dans la zone "positive"
                               # même dans un scénario pessimiste de rééchantillonnage
 
-# Pondération des 4 piliers (total = 100)
-POIDS_MONTE_CARLO = 30
-POIDS_STABILITE_ISOOS = 30
+# Pondération des 5 piliers (total = 100). Pilier 3 (Risque & Drawdown)
+# retiré : ses deux composantes (ratio profit/DD absolu, série de pertes)
+# posaient des seuils sur l'AMPLEUR du risque, une question qui appartient
+# au score de Risque, pas à la question "ce résultat se reproduit-il dans
+# le temps" que pose Robustesse -- il faisait double emploi. Remplacé par
+# deux piliers construits sur des tests déjà calculés à chaque analyse
+# mais jusqu'ici seulement utilisés comme alertes, jamais notés : la
+# fragilité à l'échantillon (bootstrap) et la stabilité temporelle
+# (fenêtres rolling).
+POIDS_MONTE_CARLO = 25
+POIDS_STABILITE_ISOOS = 25
 SEUIL_FENETRES_FAIBLES_PCT = 40    # % de fenêtres faibles (<0.5) à partir duquel la cohérence inter-fenêtres est pénalisée
 SEUIL_STABILITE_POUR_PENALITE = 0.5  # la pénalité ne s'applique que si la médiane elle-même reste correcte (sinon déjà pénalisée ailleurs)
 MULT_PENALITE_INCOHERENCE = 0.7
-POIDS_RISQUE_DRAWDOWN = 20
-POIDS_CONCENTRATION = 20
+POIDS_FRAGILITE_ECHANTILLON = 20
+POIDS_CONCENTRATION = 15
+POIDS_STABILITE_TEMPORELLE = 15
 
 # Pilier 1 (Monte Carlo) — seuils du ratio de sensibilité du drawdown à
 # l'ordre des trades (pire_mdd_95 simulé / drawdown réel observé).
@@ -1119,90 +1128,48 @@ def analyser_pilier_is_oos(fenetres, oos_trades_all):
 
 
 # ============================================================
-# PILIER 3 : Risque & Drawdown
+# PILIER 3 : Fragilité à l'Échantillon (bootstrap)
+#
+# Retire aléatoirement 10% des trades, des milliers de fois, et mesure
+# quelle proportion des tirages reste rentable. Une vraie question de
+# robustesse : "ce résultat dépend-il de quelques trades précis, ou
+# tient-il même quand on en retire une partie au hasard ?" -- déjà
+# calculé à chaque analyse pour l'onglet Stress Pro, mais jusqu'ici
+# seulement utilisé comme alerte, jamais transformé en score.
 # ============================================================
 
-def analyser_pilier_risque_drawdown(oos_trades, segments=None):
-    if len(oos_trades) == 0:
-        return {"score": 0, "warnings": [{"level": "critical", "message": "Aucun trade sur la période de test pour analyser le risque."}], "max_losing_streak": 0, "profit_to_dd_ratio": None}
+def calculer_score_fragilite(fragilite_res):
+    if fragilite_res is None:
+        return None
+    prob = fragilite_res.get("bootstrap_prob_positif")
+    if prob is None:
+        return None
+    return _score_par_paliers(prob, [
+        (50.0, 0), (70.0, 12), (90.0, 18), (100.0, POIDS_FRAGILITE_ECHANTILLON),
+    ])
 
-    profit_oos = float(oos_trades.sum())
-    if segments:
-        segments_valides = [np.asarray(seg, dtype=float) for seg in segments if len(seg) > 0]
-        dd_oos = max((calculer_max_drawdown(seg) for seg in segments_valides), default=0.0)
-    else:
-        dd_oos = calculer_max_drawdown(oos_trades)
 
-    warnings = []
-    score = POIDS_RISQUE_DRAWDOWN
-    # Deux vues sont conservées : le ratio agrégé décrit le résultat global,
-    # tandis que le score doit aussi tenir compte d'une fenêtre OOS
-    # individuellement défavorable. Sinon une grosse bonne fenêtre peut
-    # masquer une fenêtre de test très dégradée.
-    profit_to_dd_ratio_global = None
-    profit_to_dd_ratio_pire_fenetre = None
+# ============================================================
+# PILIER 5 : Stabilité Temporelle (fenêtres rolling)
+#
+# Découpe l'historique de test en fenêtres qui se chevauchent et mesure
+# quelle proportion est individuellement rentable. Répond à "la
+# performance est-elle régulière dans le temps, ou repose-t-elle sur une
+# seule bonne période ?" -- même logique que la Fragilité : déjà calculé
+# pour Stress Pro, jamais noté jusqu'ici. Retourne None si l'historique
+# est trop court pour construire des fenêtres rolling fiables plutôt que
+# d'inventer un score sur une base insuffisante.
+# ============================================================
 
-    if dd_oos > 0:
-        profit_to_dd_ratio_global = round(profit_oos / dd_oos, 2)
-
-    if segments:
-        ratios_fenetres = []
-        for seg in segments:
-            seg = np.asarray(seg, dtype=float)
-            if len(seg) == 0:
-                continue
-            seg_profit = float(np.sum(seg))
-            seg_dd = calculer_max_drawdown(seg)
-            if seg_dd > 0:
-                ratios_fenetres.append(seg_profit / seg_dd)
-            elif seg_profit <= 0:
-                # Une fenêtre sans drawdown mais non profitable reste une
-                # fenêtre défavorable pour la robustesse temporelle.
-                ratios_fenetres.append(float('-inf'))
-        if ratios_fenetres:
-            ratio_pire = min(ratios_fenetres)
-            profit_to_dd_ratio_pire_fenetre = (
-                round(ratio_pire, 2) if np.isfinite(ratio_pire) else None
-            )
-
-    ratio_pour_score = profit_to_dd_ratio_pire_fenetre if profit_to_dd_ratio_pire_fenetre is not None else profit_to_dd_ratio_global
-
-    if ratio_pour_score is not None:
-        if ratio_pour_score < 0.5:
-            score -= 12
-            warnings.append({"level": "critical", "message": "Risque élevé : au moins une période de test présente un rapport profit/drawdown inférieur à 0,5."})
-        elif ratio_pour_score < 1.0:
-            score -= 6
-            warnings.append({"level": "warning", "message": "Au moins une période de test présente un drawdown élevé par rapport au profit généré."})
-
-    # Les fenêtres OOS sont séparées dans le temps : une série de pertes ne
-    # doit jamais être prolongée artificiellement d'une fenêtre à la suivante.
-    segments_streak = segments if segments else [oos_trades]
-    max_pertes_consecutives = 0
-    for segment in segments_streak:
-        pertes_consecutives = 0
-        for t in segment:
-            if t < 0:
-                pertes_consecutives += 1
-                max_pertes_consecutives = max(max_pertes_consecutives, pertes_consecutives)
-            else:
-                pertes_consecutives = 0
-
-    if max_pertes_consecutives >= 8:
-        score -= 8
-        warnings.append({"level": "critical", "message": f"Série de pertes : {max_pertes_consecutives} pertes consécutives observées pendant les tests."})
-    elif max_pertes_consecutives >= 5:
-        score -= 4
-        warnings.append({"level": "warning", "message": f"Série de pertes notable : {max_pertes_consecutives} pertes d'affilée pendant les tests."})
-
-    return {
-        "score": max(0, score),
-        "max_losing_streak": int(max_pertes_consecutives),
-        "profit_to_dd_ratio": profit_to_dd_ratio_global,
-        "profit_to_dd_ratio_pire_fenetre": profit_to_dd_ratio_pire_fenetre,
-        "warnings": warnings
-    }
-
+def calculer_score_stabilite_temporelle(rolling_res):
+    if rolling_res is None or rolling_res.get("rolling_insuffisant"):
+        return None
+    pct = rolling_res.get("rolling_profitable_pct")
+    if pct is None:
+        return None
+    return _score_par_paliers(pct, [
+        (40.0, 0), (60.0, 8), (80.0, 13), (100.0, POIDS_STABILITE_TEMPORELLE),
+    ])
 
 # ============================================================
 # PILIER 4 : Concentration des profits (effet "loterie")
@@ -1658,11 +1625,11 @@ def calculer_fourchette_score(fenetres, rng, n_replicates=N_CI_REPLICATES, n_per
             oos_resample, rng, num_simulations=n_perms_inner, segments=segments_bootstrap
         )
         p2_r = analyser_pilier_is_oos(fenetres_bootstrap, oos_resample)
-        p3_r = analyser_pilier_risque_drawdown(oos_resample, segments=segments_bootstrap)
         p4_r = analyser_pilier_concentration(oos_resample)
 
-        total = mc_r["score"] + p2_r["score"] + p3_r["score"] + p4_r["score"]
-        scores[i] = max(0, min(100, total))
+        poids_ci = POIDS_MONTE_CARLO + POIDS_STABILITE_ISOOS + POIDS_CONCENTRATION
+        total_ci = mc_r["score"] + p2_r["score"] + p4_r["score"]
+        scores[i] = max(0, min(100, round(total_ci / poids_ci * 100)))
 
     return {
         "median": round(float(np.median(scores)), 1),
@@ -3672,12 +3639,31 @@ def construire_resultat_analyse(
     rolling_res["rolling_max_window_profit_pct"] = pct(rolling_res["rolling_max_window_profit"])
 
     pilier2_res = analyser_pilier_is_oos(fenetres, oos_trades)
-    pilier3_res = analyser_pilier_risque_drawdown(oos_trades, segments=[f["oos_trades"] for f in fenetres])
     pilier4_res = analyser_pilier_concentration(oos_trades)
     risque_ruine_res = evaluer_risque_de_ruine(oos_trades, oos_volumes)
 
-    # 4. Score Global (Total 100 points)
-    score_global_brut = max(0, min(100, pilier2_res["score"] + score_mc + pilier3_res["score"] + pilier4_res["score"]))
+    # 4. Score Global (Total 100 points) -- 5 piliers. Fragilité et
+    # Stabilité Temporelle peuvent être None sur un historique trop court
+    # pour construire des fenêtres rolling fiables ; leur poids est alors
+    # redistribué sur les piliers disponibles plutôt que de compter comme
+    # un zéro silencieux, qui pénaliserait injustement un historique
+    # simplement trop court pour ce test précis (déjà signalé ailleurs).
+    score_fragilite = calculer_score_fragilite(fragilite_res)
+    score_stabilite_temporelle = calculer_score_stabilite_temporelle(rolling_res)
+
+    piliers_actifs = [
+        ("stabilite_isoos", pilier2_res["score"], POIDS_STABILITE_ISOOS),
+        ("monte_carlo", score_mc, POIDS_MONTE_CARLO),
+        ("concentration", pilier4_res["score"], POIDS_CONCENTRATION),
+    ]
+    if score_fragilite is not None:
+        piliers_actifs.append(("fragilite", score_fragilite, POIDS_FRAGILITE_ECHANTILLON))
+    if score_stabilite_temporelle is not None:
+        piliers_actifs.append(("stabilite_temporelle", score_stabilite_temporelle, POIDS_STABILITE_TEMPORELLE))
+
+    poids_total_piliers = sum(poids for _, _, poids in piliers_actifs)
+    somme_piliers = sum(s for _, s, _ in piliers_actifs)
+    score_global_brut = max(0, min(100, int(round(somme_piliers / poids_total_piliers * 100))))
 
     # 4bis. Signatures de gestion du risque : DIAGNOSTIC, pas multiplicateur
     # global. Les signaux de payoff, d'escalade des pertes, de queue extrême
@@ -3762,7 +3748,6 @@ def construire_resultat_analyse(
     toutes_les_alertes = (
         tagger(import_warnings, "donnees", "recommandation")
         + tagger(pilier2_res["warnings"], "robustesse", "alerte")
-        + tagger(pilier3_res["warnings"], "robustesse", "alerte")
         + tagger(pilier4_res["warnings"], "robustesse", "alerte")
         + tagger(risque_ruine_res["alertes"], "risque", "alerte")
     )
@@ -4005,11 +3990,9 @@ def construire_resultat_analyse(
             "score_fourchette": fourchette,
             "score_monte_carlo": score_mc,
             "score_stabilite_is_oos": pilier2_res["score"],
-            "score_risque_drawdown": pilier3_res["score"],
+            "score_fragilite": score_fragilite,
             "score_concentration": pilier4_res["score"],
-            "max_losing_streak": pilier3_res["max_losing_streak"],
-            "profit_to_dd_ratio": pilier3_res["profit_to_dd_ratio"],
-            "profit_to_dd_ratio_pire_fenetre": pilier3_res.get("profit_to_dd_ratio_pire_fenetre"),
+            "score_stabilite_temporelle": score_stabilite_temporelle,
             "concentration_pct": pilier4_res["concentration_pct"],
             "top_n_trades": pilier4_res["top_n_trades"],
             "top_gains_sum": pilier4_res["top_gains_sum"],
