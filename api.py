@@ -2198,6 +2198,10 @@ def calculer_score_risque(mdd_pct, mdd_source, stress_recovery_factor, risque_ru
             score_mdd = 12 - (mdd_pct - 20) / 15 * 12
         else:
             score_mdd = 0.0
+        if mdd_pct > 35:
+            avertissements.append({"level": "critical", "message": f"Max Drawdown élevé ({mdd_pct:.1f}%) : une chute de cette ampleur est difficile à tenir psychologiquement et financièrement en compte réel, indépendamment du reste du profil."})
+        elif mdd_pct > 20:
+            avertissements.append({"level": "warning", "message": f"Max Drawdown notable ({mdd_pct:.1f}%) : à mettre en perspective avec votre tolérance réelle au risque avant de conclure."})
     else:
         score_mdd = None
 
@@ -2220,7 +2224,7 @@ def calculer_score_risque(mdd_pct, mdd_source, stress_recovery_factor, risque_ru
     ])
     score_signaux = max(0.0, POIDS_RISQUE_SIGNAUX_RUINE - n_signaux * (POIDS_RISQUE_SIGNAUX_RUINE / 3))
     if n_signaux > 0:
-        avertissements.append(f"{n_signaux} signal(aux) de gestion du risque actif(s) sur cette analyse.")
+        avertissements.append({"level": "warning", "message": f"{n_signaux} signal(aux) de gestion du risque actif(s) sur cette analyse."})
 
     # Axe 4 : viabilité sous stress de coûts -- utilise les scénarios déjà
     # calculés (0.5x/1x/1.5x/2x) pour un score gradué plutôt qu'un simple
@@ -2241,6 +2245,8 @@ def calculer_score_risque(mdd_pct, mdd_source, stress_recovery_factor, risque_ru
             score_serie = POIDS_RISQUE_SERIE_PERTES - (max_pertes_consecutives_absolu - 5) / 10 * POIDS_RISQUE_SERIE_PERTES
         else:
             score_serie = float(POIDS_RISQUE_SERIE_PERTES)
+        if max_pertes_consecutives_absolu >= 15:
+            avertissements.append({"level": "critical", "message": f"Série de pertes longue ({max_pertes_consecutives_absolu} pertes consécutives) : ce genre de séquence est difficile à tenir sans dévier de la stratégie en compte réel, même si le résultat global reste positif."})
     else:
         score_serie = None
 
@@ -2258,8 +2264,10 @@ def calculer_score_risque(mdd_pct, mdd_source, stress_recovery_factor, risque_ru
             score_duree = 4 - (duree_jours - 180) / 185 * 4
         else:
             score_duree = 0.0
+        if duree_jours > 365:
+            avertissements.append({"level": "warning", "message": f"Temps sous l'eau très long ({duree_jours} jours, plus d'un an) : même sans y être encore, le compte est resté sous son plus haut niveau pendant une durée considérable -- un facteur psychologique à ne pas sous-estimer en compte réel."})
         if duree_drawdown_res.get("toujours_en_cours_a_la_fin"):
-            avertissements.append(f"Le plus long temps sous l'eau ({duree_jours} jours) n'était pas encore terminé à la fin de l'historique testé -- le vrai pire cas pourrait être plus long.")
+            avertissements.append({"level": "warning", "message": f"Le plus long temps sous l'eau ({duree_jours} jours) n'était pas encore terminé à la fin de l'historique testé -- le vrai pire cas pourrait être plus long."})
     else:
         score_duree = None
 
@@ -2278,6 +2286,8 @@ def calculer_score_risque(mdd_pct, mdd_source, stress_recovery_factor, risque_ru
             score_ulcer = 12 - (ulcer_index - 7) / 7 * 12
         else:
             score_ulcer = 0.0
+        if ulcer_index > 14:
+            avertissements.append({"level": "critical", "message": f"Ulcer Index élevé ({ulcer_index:.1f}, repère : > 14 = mauvais) : combine profondeur et durée des drawdowns en un seul chiffre -- ce niveau suggère des creux à la fois profonds et longs, pas juste un pic isolé."})
     else:
         score_ulcer = None
 
@@ -3847,6 +3857,7 @@ def construire_resultat_analyse(
         + tagger(pilier2_res["warnings"], "robustesse", "alerte")
         + tagger(pilier4_res["warnings"], "robustesse", "alerte")
         + tagger(risque_ruine_res["alertes"], "risque", "alerte")
+        + tagger(risque_res["avertissements"], "risque", "alerte")
     )
 
     # Absence totale ou quasi-totale de pertes : signal direct, vérifié
