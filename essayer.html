@@ -8555,6 +8555,9 @@ ${interpreterStabilite(rob.stability_ratio, rob.fenetres_faibles_pct)}
 Ratio de stabilité médian : ${rob.stability_ratio}
 Profit Factor Test (toutes fenêtres) : ${rob.oos_profit_factor}
 Fenêtres faibles (< 0.5) : ${rob.fenetres_faibles_pct}%
+${(data.walkforward && data.walkforward.fenetres && data.walkforward.fenetres.length)
+    ? '\n--- DÉTAIL PAR FENÊTRE WALK-FORWARD ---\n' + data.walkforward.fenetres.map(f => `  Fenêtre ${f.index} : référence ${f.periode_is ? f.periode_is.debut + ' → ' + f.periode_is.fin : '--'} (PF ${f.is_pf ?? 'N/D'}) → test ${f.periode_oos ? f.periode_oos.debut + ' → ' + f.periode_oos.fin : '--'} (PF ${f.oos_pf ?? 'N/D'}, profit ${f.oos_profit} ${d})`).join('\n')
+    : ''}
 
 --- PILIER 2 — SENSIBILITÉ DE TRAJECTOIRE / MONTE CARLO (${mc.score_path} / 25) ---
 ${interpreterMonteCarlo(mc.stress_recovery_factor, mc.path_sensitivity_ratio, mc.plancher_absolu_applique)}
