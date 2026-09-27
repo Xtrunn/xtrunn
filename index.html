@@ -1346,6 +1346,8 @@
 
         .module-section { display: none; animation: deriveIn 0.4s cubic-bezier(.2,.7,.3,1); }
         .module-section.active { display: block; }
+        body.type-suivi #epreuveRailNav .sub-tab,
+        body.type-suivi #epreuveRailNav .rail-section { display: none; }
         @keyframes deriveIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
@@ -1829,7 +1831,7 @@
     <div id="env-algo">
     <div class="mode-switcher-classique" id="modeSwitcherClassique" style="display:none;">
         <button type="button" class="mode-switcher-classique-btn active" data-mode="analyse" onclick="basculerModeAccueil('analyse')">Analyse</button>
-        <button type="button" class="mode-switcher-classique-btn" data-mode="validation_officielle" onclick="basculerModeAccueil('validation_officielle')">Validation</button>
+        <button type="button" class="mode-switcher-classique-btn" data-mode="validation_officielle" onclick="basculerModeAccueil('validation_officielle')">Suivi</button>
     </div>
 
     <div class="mode-switcher" id="modeSwitcher">
@@ -1840,9 +1842,9 @@
             <span>◎</span>
             <span class="mode-node-label active-label">Analyse</span>
         </div>
-        <div class="mode-node-target" id="modeNodeValidationOfficielle" style="left:53.10px; top:299.30px;" onclick="basculerModeAccueil('validation_officielle')" title="Validation Officielle">
+        <div class="mode-node-target" id="modeNodeValidationOfficielle" style="left:53.10px; top:299.30px;" onclick="basculerModeAccueil('validation_officielle')" title="Suivi">
             <span class="mode-node-icon mode-icon-validation"><svg viewBox="3.3 1.23 18.62 26.15" width="20" height="28" fill="currentColor"><path d="M12.33 2.73L10.73 3.76L8.56 3.76L7.72 5.46L7.25 5.84L6.21 6.21L5.84 6.59L5.84 8.66L4.8 10.26L4.8 10.73L5.84 12.33L5.74 14.21L5.93 14.59L7.62 15.44L8.56 17.22L8.94 17.41L10.64 17.22L11.11 17.41L12.24 18.26L12.99 18.26L14.12 17.41L14.59 17.22L16.38 17.41L16.85 17.04L17.22 16.0L17.79 15.34L19.39 14.49L19.39 12.42L19.67 11.76L20.42 10.82L20.42 10.16L19.67 9.22L19.39 8.56L19.39 6.49L17.69 5.65L17.22 4.99L16.66 3.76L14.49 3.76L14.31 3.58L14.02 3.58L12.89 2.73Z"/><path d="M7.81 17.22L5.46 24.19L8.09 22.96L8.66 22.87L9.13 23.25L10.54 25.88L12.89 19.01L12.33 19.01L10.82 17.98L8.56 17.98Z"/><path d="M17.51 17.32L17.32 17.32L16.66 17.98L14.4 17.98L13.65 18.64L12.99 20.61L12.99 20.99L14.68 25.88L16.38 22.96L16.94 22.87L19.76 24.19Z"/><path d="M16.19 8.85L15.53 8.19L15.34 8.19L11.67 11.86L11.39 11.86L9.88 10.35L9.69 10.35L9.13 11.11L11.58 13.55Z" fill="#00000070"/></svg></span>
-            <span class="mode-node-label">Validation</span>
+            <span class="mode-node-label">Suivi</span>
         </div>
         <div class="mode-node-handle" id="modeNodeHandle" style="left:53.10px; top:140.70px;" onpointerdown="demarrerDragOrbite(event)"></div>
     </div>
@@ -1976,8 +1978,8 @@
         <div id="modeValidationOfficielleContent" class="mode-content" style="display:none;">
             <div id="voListeContainer">
                 <div class="mode-hero">
-                    <h2>Validation Officielle</h2>
-                    <p>Le vrai test complet du logiciel — une stratégie déjà analysée et jugée robuste, confrontée à l'exécution réelle, avec un verdict qui ne laisse aucune ambiguïté.</p>
+                    <h2>Suivi</h2>
+                    <p>Suivez une stratégie en conditions réelles, avec des règles fixées à l'avance : XTRUNN vous dit quand elle reste saine, quand la surveiller de plus près, et quand la couper.</p>
                 </div>
 
                 <div class="panel" style="text-align:center; padding:36px 30px;">
@@ -1986,14 +1988,15 @@
                         <div class="vo-demo-cible"></div>
                     </div>
                     <p style="font-size:0.85rem; color:var(--horizon); max-width:440px; margin:22px auto 0; line-height:1.6;">
-                        Pour démarrer une Validation Officielle, glissez une carte de stratégie depuis le mode Analyse jusqu'à ce nœud, dans le sélecteur à gauche — seules celles ayant déjà un score assez robuste peuvent être déposées ici.
+                        Pour suivre une stratégie déjà analysée, glissez sa carte depuis le mode Analyse jusqu'à ce nœud, dans le sélecteur à gauche. Aucun score minimum n'est exigé : une stratégie fragile a encore plus besoin d'être suivie de près.
                     </p>
+                    <button class="btn-analyser" style="margin-top:22px; background:transparent; color:var(--silver-bright); border:1px solid var(--border-silver);" onclick="ouvrirModalConfigurerSuivi(null)">Créer un suivi vierge</button>
                 </div>
 
-                <div class="panel-title" style="margin-bottom:14px; margin-top:36px;">Vos Validations</div>
+                <div class="panel-title" style="margin-bottom:14px; margin-top:36px;">Vos Suivis</div>
                 <div class="panel">
                     <div id="voSansCandidat" style="display:none; color:var(--text-muted); font-size:0.8rem;">
-                        Aucune Validation Officielle en cours pour le moment.
+                        Aucun suivi pour le moment.
                     </div>
                     <div id="voListe"></div>
                 </div>
@@ -3108,6 +3111,101 @@
                         </p>
                         <div id="epDiagStatsContainer"></div>
                     </div>
+                </div>
+            </div>
+
+            <div id="mod-suivi" class="module-section">
+                <div class="panel">
+                    <div class="panel-title">Statut Actuel</div>
+                    <div style="text-align:center; padding:10px 0 4px;">
+                        <div id="suiviStatutGrand" style="font-family:'Space Grotesk',sans-serif; font-size:2.4rem; font-weight:700; letter-spacing:1px;">--</div>
+                        <div id="suiviStatutMessage" style="font-size:0.84rem; color:var(--text-muted); margin-top:8px; line-height:1.5; max-width:560px; margin-left:auto; margin-right:auto;"></div>
+                    </div>
+                    <div id="suiviBandeauDonnees" style="display:none; margin-top:14px; padding:10px 14px; background:rgba(255,255,255,0.03); border:1px dashed var(--ash-bright); border-radius:8px; font-size:0.78rem; color:var(--text-muted); line-height:1.5;"></div>
+                    <div id="suiviRaisons" style="margin-top:14px;"></div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-title">Drawdown Max Atteint vs Vos Seuils <span class="info-tip" data-tip="Le pire creux traversé depuis le début du suivi, en % du plus haut atteint. Le trait ambre est votre seuil d'alerte interne, le trait rouge la limite dure : la franchir coupe la stratégie sans condition.">?</span></div>
+                    <div id="suiviJauge"></div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-title">Chiffres Clés</div>
+                    <div class="metric-row-4">
+                        <div class="mc-info-card"><div class="mc-info-title">Profit Net</div><div class="mc-info-val" id="suiviKpiProfit">--</div></div>
+                        <div class="mc-info-card"><div class="mc-info-title">Drawdown Max Atteint</div><div class="mc-info-val" id="suiviKpiDrawdown">--</div></div>
+                        <div class="mc-info-card"><div class="mc-info-title">Pire Journée</div><div class="mc-info-val" id="suiviKpiPireJour">--</div></div>
+                        <div class="mc-info-card"><div class="mc-info-title">Trades / Jours</div><div class="mc-info-val" id="suiviKpiTrades">--</div></div>
+                    </div>
+                    <div id="suiviFenetreBloc" style="display:none;">
+                        <div class="panel-title" style="font-size:0.72rem; margin-top:6px;">Tendance Récente <span class="info-tip" data-tip="Calculée uniquement sur les derniers trades (la fenêtre glissante fixée au lancement), séparément de l'historique complet -- une stratégie peut rester positive au total tout en se dégradant nettement depuis peu.">?</span></div>
+                        <div class="metric-row-4" style="grid-template-columns: repeat(3, 1fr);">
+                            <div class="mc-info-card"><div class="mc-info-title" id="suiviFenetreTitre">Derniers trades</div><div class="mc-info-val" id="suiviFenetreN">--</div></div>
+                            <div class="mc-info-card"><div class="mc-info-title">Profit Factor Récent</div><div class="mc-info-val" id="suiviFenetrePf">--</div></div>
+                            <div class="mc-info-card"><div class="mc-info-title">Taux de Gain Récent</div><div class="mc-info-val" id="suiviFenetreWr">--</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-title">Courbe de Capital</div>
+                    <div id="suiviCourbe"></div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-title">Ajouter des Trades</div>
+                    <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
+                        <div class="input-group" style="flex:1; min-width:130px; margin-bottom:0;">
+                            <label>Date</label>
+                            <input type="date" id="suiviTradeDate">
+                        </div>
+                        <div class="input-group" style="flex:1; min-width:110px; margin-bottom:0;">
+                            <label>Profit / Perte</label>
+                            <input type="number" id="suiviTradeProfit" placeholder="ex. -42.5" step="0.01">
+                        </div>
+                        <div class="input-group" style="flex:1; min-width:110px; margin-bottom:0;">
+                            <label>Symbole <span style="text-transform:none; letter-spacing:0; opacity:0.7;">(optionnel)</span></label>
+                            <input type="text" id="suiviTradeSymbole" placeholder="EURUSD">
+                        </div>
+                        <button class="btn-analyser" style="flex:0 0 auto; padding:12px 22px;" onclick="ajouterTradeSuivi()">Ajouter</button>
+                    </div>
+                    <div class="input-group" style="margin-top:12px; margin-bottom:0;">
+                        <label>Notes <span style="text-transform:none; letter-spacing:0; opacity:0.7;">(optionnel)</span></label>
+                        <input type="text" id="suiviTradeNotes" placeholder="ex. sorti avant le stop, news en cours...">
+                    </div>
+
+                    <div style="border-top:1px solid var(--ash); margin-top:20px; padding-top:18px;">
+                        <div style="font-size:0.74rem; color:var(--text-muted); margin-bottom:10px; line-height:1.5;">Ou importer un export de votre plateforme. Vous pouvez réimporter l'historique complet à chaque fois : les trades déjà enregistrés sont reconnus et ignorés, jamais dupliqués.</div>
+                        <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
+                            <div class="input-group" style="flex:2; min-width:200px; margin-bottom:0;">
+                                <label>Fichier</label>
+                                <input type="file" id="suiviImportFile" accept=".csv, .xlsx, .xls, .htm, .html">
+                            </div>
+                            <div class="input-group" style="flex:1; min-width:140px; margin-bottom:0;">
+                                <label>Plateforme</label>
+                                <select id="suiviImportPlateforme">
+                                    <option value="mt5">MetaTrader 5</option>
+                                    <option value="mt4">MetaTrader 4</option>
+                                    <option value="ctrader">cTrader</option>
+                                    <option value="tradingview">TradingView</option>
+                                </select>
+                            </div>
+                            <button class="btn-analyser" style="flex:0 0 auto; padding:12px 22px; background:transparent; color:var(--silver-bright); border:1px solid var(--border-silver);" onclick="importerTradesSuivi()">Importer</button>
+                        </div>
+                        <div id="suiviImportMsg" style="display:none; margin-top:12px; font-size:0.78rem;"></div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-title">Historique des Trades <span id="suiviNbTradesListe" style="font-weight:400; opacity:0.6;"></span></div>
+                    <div id="suiviListeTrades" style="max-height:420px; overflow-y:auto;"></div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-title">Seuils Fixés au Lancement</div>
+                    <div id="suiviResumeSeuils" style="font-size:0.8rem; line-height:1.9; color:var(--text-muted);"></div>
+                    <button class="btn-analyser" style="margin-top:16px; background:transparent; color:var(--danger); border:1px solid rgba(201,106,99,0.4);" onclick="supprimerEpreuveActuelleEcran()">Supprimer ce suivi</button>
                 </div>
             </div>
         </div>
@@ -5680,7 +5778,9 @@
             if (!dragCarteInfo || e.pointerId !== dragCarteInfo.pointerId) return;
             const dx = e.clientX - dragCarteInfo.startX;
             const dy = e.clientY - dragCarteInfo.startY;
-            const estEligible = dragCarteInfo.scoreP10 !== null && dragCarteInfo.scoreP10 !== undefined && dragCarteInfo.scoreP10 >= SEUIL_SCORE_VALIDATION;
+            // Aucune porte de score : une stratégie fragile a encore plus
+            // besoin d'être suivie de près qu'une bonne.
+            const estEligible = true;
             if (!dragCarteInfo.enCoursDeDrag) {
                 if (Math.hypot(dx, dy) < DRAG_SEUIL_PX) return;
                 dragCarteInfo.enCoursDeDrag = true;
@@ -6003,7 +6103,7 @@
             try {
                 const resp = await fetch('http://127.0.0.1:8000/epreuves');
                 const data = await resp.json();
-                const validations = data.epreuves.filter(ep => ep.type_epreuve === 'validation');
+                const validations = data.epreuves.filter(ep => ep.type_epreuve === 'suivi');
                 voListeCache = validations;
 
                 const liste = document.getElementById('voListe');
@@ -6014,20 +6114,15 @@
                 } else {
                     sansCandidat.style.display = 'none';
                     liste.innerHTML = '<div class="strategy-card-versions-list">' + validations.map(ep => {
-                        const date = formaterDateAffichage(new Date(ep.created_at));
-                        let etatTxt, cls;
-                        if (ep.statut === 'en_cours') {
-                            etatTxt = `Épreuve en cours — ${ep.jours_ecoules}/${ep.duree_jours} jours`; cls = 'warning';
-                        } else if (ep.statut === 'reussi') {
-                            etatTxt = '✓✓ Certifié — voir le verdict'; cls = 'positive';
-                        } else {
-                            etatTxt = 'Terminé — voir le verdict'; cls = 'negative';
-                        }
+                        const couleurs = { sain: 'var(--success)', a_surveiller: 'var(--warning)', coupe: 'var(--danger)' };
+                        const labels = { sain: 'SAIN', a_surveiller: 'À SURVEILLER', coupe: 'COUPE' };
+                        const couleur = couleurs[ep.statut] || 'var(--text-muted)';
+                        const ddTxt = ep.drawdown_max_pct ? `${ep.drawdown_pct}% / ${ep.drawdown_max_pct}%` : `${ep.drawdown_pct}%`;
                         return `
-                            <div class="strategy-card-version-row v-open" onclick="ouvrirParcoursValidation(${ep.id})">
+                            <div class="strategy-card-version-row v-open" onclick="ouvrirEpreuve(${ep.id})">
                                 <span class="v-open-infos">
-                                    <span class="strategy-card-version-score ${cls}">${ep.analyse_score_p10 ?? '--'}</span>
-                                    <span>${ep.strategie_nom || '--'} — ${date} · ${etatTxt}</span>
+                                    <span class="strategy-card-version-score" style="color:${couleur}; border-color:${couleur}; min-width:96px; text-align:center;">${labels[ep.statut] || ep.statut}</span>
+                                    <span>${echapperHtmlSuivi(ep.nom)}${ep.contexte ? ' · ' + echapperHtmlSuivi(ep.contexte) : ''} — ${ep.n_trades} trade(s) · drawdown max ${ddTxt}</span>
                                 </span>
                             </div>
                         `;
@@ -6053,11 +6148,7 @@
         function ouvrirParcoursValidation(epreuveId) {
             const ep = voListeCache.find(v => v.id === epreuveId);
             if (!ep) return;
-            if (ep.statut === 'en_cours') {
-                ouvrirEpreuve(ep.id);
-            } else {
-                afficherEtape3Validation(ep);
-            }
+            ouvrirEpreuve(ep.id);
         }
 
         function afficherEtape3Validation(ep) {
@@ -6100,10 +6191,11 @@
                 if (trouIntérieur) trouIntérieur.classList.add('ignited');
                 animerVoyage('plonger', () => {
                     afficherEpreuveScreen();
-                    if (c.nouvelle_revelation) {
+                    preparerCoqueEpreuve(c);
+                    if (c.type_epreuve !== 'suivi' && c.nouvelle_revelation) {
                         jouerRevelationEpreuve(c);
                     } else {
-                        renderEcranEpreuve(c);
+                        routerRenduEpreuve(c);
                     }
                 });
             } catch (err) {
@@ -6163,9 +6255,269 @@
             try {
                 const resp = await fetch('http://127.0.0.1:8000/epreuves/' + epreuveIdCourante);
                 const c = await resp.json();
-                renderEcranEpreuve(c);
+                routerRenduEpreuve(c);
             } catch (err) {
                 alert("Impossible de charger cette épreuve.");
+            }
+        }
+
+        // Le Suivi partage la coquille de l'écran Épreuve (retour, rail,
+        // en-tête) mais pas son contenu : ni compte à rebours, ni fin
+        // figée, ni score caché. Cette bascule pose la coquille dans le
+        // bon état selon le type, dans les deux sens.
+        function preparerCoqueEpreuve(c) {
+            const estSuivi = c.type_epreuve === 'suivi';
+            const etaitSuivi = document.body.classList.contains('type-suivi');
+            document.body.classList.toggle('type-suivi', estSuivi);
+            if (!estSuivi) {
+                const lbl = document.getElementById('epDetailStatutLabel');
+                lbl.style.color = '';
+                lbl.style.borderColor = '';
+                if (etaitSuivi) {
+                    document.getElementById('mod-suivi').classList.remove('active');
+                    changerOngletEpreuve('progression', document.querySelector('#epreuveRailNav .sub-tab'));
+                }
+            }
+        }
+
+        function routerRenduEpreuve(c) {
+            preparerCoqueEpreuve(c);
+            if (c.type_epreuve === 'suivi') {
+                renderEcranSuivi(c);
+            } else {
+                renderEcranEpreuve(c);
+            }
+        }
+
+        function echapperHtmlSuivi(texte) {
+            return String(texte === null || texte === undefined ? '' : texte)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function renderEcranSuivi(c) {
+            const devise = (typeof deviseSymbole !== 'undefined') ? deviseSymbole : '$';
+            const nd = (v, suffixe) => (v === null || v === undefined) ? '--' : v + (suffixe || '');
+
+            const habillage = {
+                sain: { label: 'SAIN', couleur: 'var(--success)', message: "Aucun signal inquiétant pour l'instant. Continuez normalement -- en gardant un œil sur vos seuils." },
+                a_surveiller: { label: 'À SURVEILLER', couleur: 'var(--warning)', message: "Un signal d'alerte est apparu, sans qu'aucune limite dure ne soit franchie. Réduisez la taille des positions et resserrez la surveillance plutôt que de tout couper sur un signal encore incertain." },
+                coupe: { label: 'COUPE', couleur: 'var(--danger)', message: "Une limite dure a été franchie. Arrêtez la stratégie : ce seuil n'est pas négociable." },
+            };
+            const h = habillage[c.statut] || habillage.sain;
+
+            // --- en-tête partagé avec la coquille ---
+            const lbl = document.getElementById('epDetailStatutLabel');
+            lbl.textContent = h.label;
+            lbl.className = 'epreuve-hero-compact-statut';
+            lbl.style.color = h.couleur;
+            lbl.style.borderColor = h.couleur;
+            document.getElementById('epDetailNom').textContent = c.nom;
+            document.getElementById('epRailNom').textContent = c.nom;
+            document.getElementById('epRailStatut').textContent = h.label;
+            const lienBox = document.getElementById('epDetailStrategieLien');
+            if (c.strategie_nom) {
+                lienBox.style.display = 'block';
+                lienBox.textContent = `Suit : ${c.strategie_nom}` + (c.contexte ? ` · ${c.contexte}` : '');
+            } else if (c.contexte) {
+                lienBox.style.display = 'block';
+                lienBox.textContent = c.contexte;
+            } else {
+                lienBox.style.display = 'none';
+            }
+
+            // --- une seule section visible ---
+            document.querySelectorAll('#epreuveScreen .module-section').forEach(s => s.classList.remove('active'));
+            document.getElementById('mod-suivi').classList.add('active');
+
+            // --- statut ---
+            const grand = document.getElementById('suiviStatutGrand');
+            grand.textContent = h.label;
+            grand.style.color = h.couleur;
+            document.getElementById('suiviStatutMessage').textContent = c.n_trades === 0
+                ? "Aucun trade enregistré pour l'instant. Ajoutez-en ci-dessous, à la main ou par import."
+                : h.message;
+
+            const bandeau = document.getElementById('suiviBandeauDonnees');
+            if (!c.donnees_suffisantes) {
+                let txt = `Pas encore assez de données pour juger : ${c.n_trades} trade(s)`;
+                if (c.nb_trades_min_jugement) txt += ` sur ${c.nb_trades_min_jugement} minimum`;
+                if (c.duree_min_jours_jugement) txt += `, ${c.jours_trading} jour(s) de trading sur ${c.duree_min_jours_jugement} minimum`;
+                txt += ". En attendant, seules les limites dures peuvent déclencher « Coupe » ; le reste reste « Sain » par défaut, ce qui ne prouve encore rien.";
+                bandeau.textContent = txt;
+                bandeau.style.display = 'block';
+            } else {
+                bandeau.style.display = 'none';
+            }
+
+            const raisonsBox = document.getElementById('suiviRaisons');
+            if (c.raisons && c.raisons.length) {
+                raisonsBox.innerHTML = c.raisons.map(r => `<div class="method-note" style="border-color:${h.couleur}; margin-bottom:8px;"><span class="method-note-icon" style="color:${h.couleur};">⚠</span><p>${echapperHtmlSuivi(r)}</p></div>`).join('');
+            } else {
+                raisonsBox.innerHTML = '';
+            }
+
+            // --- jauge de drawdown ---
+            const dd = c.drawdown_pct || 0;
+            const alerte = c.seuil_alerte_drawdown_pct || null;
+            const dur = c.drawdown_max_pct || null;
+            const jaugeBox = document.getElementById('suiviJauge');
+            if (!alerte && !dur) {
+                jaugeBox.innerHTML = `<p style="font-size:0.8rem; color:var(--text-muted);">Aucun seuil de drawdown défini pour ce suivi. Drawdown max atteint : ${dd.toFixed(2)}%.</p>`;
+            } else {
+                const echelle = Math.max(dur || 0, (alerte || 0) * 1.25, dd * 1.1, 0.5);
+                const pos = (v) => Math.min(100, v / echelle * 100);
+                const marqueur = (v, couleur, texte, haut) => `
+                    <div style="position:absolute; left:${pos(v)}%; top:-6px; bottom:-6px; width:2px; background:${couleur};"></div>
+                    <div style="position:absolute; left:${pos(v)}%; ${haut ? 'top:-26px;' : 'top:22px;'} transform:translateX(${pos(v) > 85 ? '-100%' : (pos(v) < 15 ? '0%' : '-50%')}); font-size:0.66rem; color:${couleur}; white-space:nowrap;">${texte}</div>`;
+                jaugeBox.innerHTML = `
+                    <div style="position:relative; height:16px; background:var(--ash); border-radius:8px; margin:34px 0 40px;">
+                        <div style="position:absolute; left:0; top:0; bottom:0; width:${pos(dd)}%; background:${h.couleur}; border-radius:8px; transition:width 0.4s;"></div>
+                        ${alerte ? marqueur(alerte, 'var(--warning)', `Alerte ${alerte}%`, true) : ''}
+                        ${dur ? marqueur(dur, 'var(--danger)', `Limite dure ${dur}%`, false) : ''}
+                    </div>
+                    <div style="font-size:0.8rem; color:var(--text-muted);">Drawdown max atteint : <strong style="color:var(--horizon);">${dd.toFixed(2)}%</strong> (${(c.drawdown_dollars || 0).toFixed(2)} ${devise})</div>`;
+            }
+
+            // --- chiffres clés ---
+            const profitEl = document.getElementById('suiviKpiProfit');
+            profitEl.textContent = `${c.profit_net >= 0 ? '+' : ''}${(c.profit_net || 0).toFixed(2)} ${devise} (${c.profit_pct >= 0 ? '+' : ''}${(c.profit_pct || 0).toFixed(2)}%)`;
+            profitEl.className = 'mc-info-val ' + ((c.profit_net || 0) >= 0 ? 'positive' : 'negative');
+            document.getElementById('suiviKpiDrawdown').textContent = `${dd.toFixed(2)}%`;
+            document.getElementById('suiviKpiPireJour').textContent = `${(c.pire_jour_pct || 0).toFixed(2)}%`;
+            document.getElementById('suiviKpiTrades').textContent = `${c.n_trades} / ${c.jours_trading} j`;
+
+            const fen = c.fenetre_glissante;
+            const fenBloc = document.getElementById('suiviFenetreBloc');
+            if (fen) {
+                fenBloc.style.display = 'block';
+                document.getElementById('suiviFenetreTitre').textContent = 'Trades pris en compte';
+                document.getElementById('suiviFenetreN').textContent = fen.n_trades_fenetre;
+                document.getElementById('suiviFenetrePf').textContent = fen.profit_factor_fenetre === null ? '∞ (aucune perte)' : fen.profit_factor_fenetre;
+                document.getElementById('suiviFenetreWr').textContent = `${fen.winrate_fenetre_pct}%`;
+            } else {
+                fenBloc.style.display = 'none';
+            }
+
+            // --- courbe de capital ---
+            const pts = c.courbe || [];
+            const courbeBox = document.getElementById('suiviCourbe');
+            if (pts.length < 2) {
+                courbeBox.innerHTML = '<p style="font-size:0.8rem; color:var(--text-muted);">La courbe apparaîtra dès le premier trade.</p>';
+            } else {
+                const W = 640, H = 160, P = 8;
+                const mn = Math.min(...pts, c.capital_initial), mx = Math.max(...pts, c.capital_initial);
+                const span = (mx - mn) || 1;
+                const px = (i) => P + i / (pts.length - 1) * (W - 2 * P);
+                const py = (v) => H - P - (v - mn) / span * (H - 2 * P);
+                const poly = pts.map((v, i) => `${px(i).toFixed(1)},${py(v).toFixed(1)}`).join(' ');
+                const yBase = py(c.capital_initial).toFixed(1);
+                const couleurCourbe = pts[pts.length - 1] >= c.capital_initial ? 'var(--success)' : 'var(--danger)';
+                courbeBox.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;"><line x1="${P}" x2="${W - P}" y1="${yBase}" y2="${yBase}" style="stroke:var(--ash-bright); stroke-dasharray:4 4;"></line><polyline points="${poly}" style="fill:none; stroke:${couleurCourbe}; stroke-width:2; stroke-linejoin:round;"></polyline></svg>`;
+            }
+
+            // --- historique ---
+            const trades = (c.trades || []).slice().reverse();
+            document.getElementById('suiviNbTradesListe').textContent = trades.length ? `(${trades.length})` : '';
+            const listeBox = document.getElementById('suiviListeTrades');
+            if (!trades.length) {
+                listeBox.innerHTML = '<p style="font-size:0.8rem; color:var(--text-muted);">Aucun trade pour l\'instant.</p>';
+            } else {
+                listeBox.innerHTML = trades.map(t => `
+                    <div style="display:flex; align-items:center; gap:12px; padding:8px 4px; border-bottom:1px solid var(--ash); font-size:0.78rem;">
+                        <span style="min-width:86px; color:var(--text-muted);">${echapperHtmlSuivi(t.date)}</span>
+                        <span style="min-width:70px; color:var(--text-muted);">${echapperHtmlSuivi(t.symbole || '--')}</span>
+                        <span class="${t.profit >= 0 ? 'positive' : 'negative'}" style="min-width:90px; font-weight:600;">${t.profit >= 0 ? '+' : ''}${Number(t.profit).toFixed(2)} ${devise}</span>
+                        <span style="flex:1; color:var(--text-muted); opacity:0.8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${echapperHtmlSuivi(t.notes || '')}</span>
+                        <span style="font-size:0.66rem; color:var(--text-muted); opacity:0.6;">${t.source === 'import_fichier' ? 'import' : 'manuel'}</span>
+                        <button onclick="supprimerTradeEpreuve(${t.id})" title="Supprimer ce trade" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:0.9rem;">✕</button>
+                    </div>`).join('');
+            }
+
+            // --- rappel des seuils fixés ---
+            const lignes = [
+                ['Contexte', c.contexte || 'non précisé'],
+                ['Capital de départ', `${c.capital_initial} ${devise}`],
+                ['Drawdown max (limite dure)', nd(c.drawdown_max_pct, '%')],
+                ['Perte journalière max (limite dure)', nd(c.perte_quotidienne_max_pct, '%')],
+                ['Objectif de profit', nd(c.objectif_profit_pct, '%')],
+                ["Seuil d'alerte interne (drawdown)", nd(c.seuil_alerte_drawdown_pct, '%')],
+                ['Trades minimum avant de juger', nd(c.nb_trades_min_jugement)],
+                ['Jours minimum avant de juger', nd(c.duree_min_jours_jugement)],
+                ['Fenêtre glissante', c.taille_fenetre_glissante ? `${c.taille_fenetre_glissante} derniers trades` : '--'],
+                ['Suivi démarré le', (c.date_debut || '').slice(0, 10)],
+            ];
+            document.getElementById('suiviResumeSeuils').innerHTML = lignes.map(([k, v]) => `<div style="display:flex; justify-content:space-between; gap:16px; border-bottom:1px solid var(--ash);"><span>${k}</span><strong style="color:var(--horizon); font-weight:600;">${echapperHtmlSuivi(v)}</strong></div>`).join('');
+
+            // --- date par défaut du formulaire d'ajout ---
+            const dateInput = document.getElementById('suiviTradeDate');
+            if (!dateInput.value) {
+                const now = new Date();
+                dateInput.value = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+            }
+        }
+
+        async function ajouterTradeSuivi() {
+            const date = document.getElementById('suiviTradeDate').value;
+            const profit = document.getElementById('suiviTradeProfit').value;
+            if (!date || profit === '') {
+                alert("Merci de renseigner une date et un montant.");
+                return;
+            }
+            const payload = { date: date, profit: parseFloat(profit) };
+            const symbole = document.getElementById('suiviTradeSymbole').value.trim();
+            if (symbole) payload.symbole = symbole;
+            const notes = document.getElementById('suiviTradeNotes').value.trim();
+            if (notes) payload.notes = notes;
+            try {
+                const resp = await fetch('http://127.0.0.1:8000/epreuves/' + epreuveIdCourante + '/trades', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!resp.ok) {
+                    alert("Ce trade n'a pas pu être enregistré.");
+                    return;
+                }
+                document.getElementById('suiviTradeProfit').value = '';
+                document.getElementById('suiviTradeSymbole').value = '';
+                document.getElementById('suiviTradeNotes').value = '';
+                rafraichirEcranEpreuve();
+            } catch (err) {
+                alert("Erreur lors de l'ajout du trade.");
+            }
+        }
+
+        async function importerTradesSuivi() {
+            const file = document.getElementById('suiviImportFile').files[0];
+            const msg = document.getElementById('suiviImportMsg');
+            msg.style.display = 'none';
+            if (!file) {
+                msg.textContent = "Veuillez sélectionner un fichier.";
+                msg.style.color = 'var(--danger)';
+                msg.style.display = 'block';
+                return;
+            }
+            const formData = new FormData();
+            formData.append('trades_file', file);
+            formData.append('plateforme', document.getElementById('suiviImportPlateforme').value);
+            try {
+                const resp = await fetch('http://127.0.0.1:8000/epreuves/' + epreuveIdCourante + '/trades/import', { method: 'POST', body: formData });
+                const data = await resp.json();
+                if (data.erreur || !resp.ok) {
+                    msg.textContent = data.erreur || data.detail || "Import impossible.";
+                    msg.style.color = 'var(--danger)';
+                    msg.style.display = 'block';
+                    return;
+                }
+                document.getElementById('suiviImportFile').value = '';
+                await rafraichirEcranEpreuve();
+                msg.textContent = data.message;
+                msg.style.color = 'var(--success)';
+                msg.style.display = 'block';
+            } catch (err) {
+                msg.textContent = "Erreur de connexion au backend.";
+                msg.style.color = 'var(--danger)';
+                msg.style.display = 'block';
             }
         }
 
@@ -8050,14 +8402,18 @@
         // N'affiche l'un ou l'autre sélecteur que si on est bien sur
         // l'écran d'accueil -- jamais pendant la consultation d'une
         // analyse ou le suivi d'une épreuve.
-        // Mode Validation masqué pour la v1 -- pas encore passé par le
-        // même audit et la même refonte que le mode Analyse. À réactiver
-        // une fois qu'il aura reçu le même niveau de travail.
         function appliquerTypeSelecteur() {
             const orbital = document.getElementById('modeSwitcher');
             const classique = document.getElementById('modeSwitcherClassique');
-            orbital.style.display = 'none';
-            classique.style.display = 'none';
+            const surEcranAccueil = document.body.classList.contains('etat-approach');
+            if (typeSelecteur === 'classique') {
+                orbital.style.display = 'none';
+                classique.style.display = surEcranAccueil ? 'flex' : 'none';
+            } else {
+                classique.style.display = 'none';
+                orbital.style.display = surEcranAccueil ? 'block' : 'none';
+                if (surEcranAccueil) { appliquerRotationSelecteur(); appliquerPositionSelecteur(); }
+            }
         }
 
         function masquerSelecteurs() {
@@ -8487,6 +8843,7 @@
         function retournerVersApproche() {
             afficherApproche();
             chargerStrategies();
+            chargerParcoursValidationOfficielle();
             const trou = document.getElementById('ambientBlackHole');
             trou.classList.remove('bh-hidden', 'bh-consuming');
             trou.classList.add('bh-ambient');
