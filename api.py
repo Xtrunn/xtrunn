@@ -3966,6 +3966,46 @@ def construire_resultat_analyse(
             "level": "warning", "diagnostic": "qualite", "type": "recommandation",
             "message": "Confirmez ce Profit Factor sur un historique plus long avant de vous y fier -- le score de Qualité ne le pénalise pas directement, c'est au diagnostic de Robustesse de juger si ce résultat tient dans le temps."
         })
+    if qualite_perf_res is not None and ratios_performance is not None:
+        sharpe = ratios_performance.get("sharpe_ratio")
+        if sharpe is not None and sharpe <= 0:
+            toutes_les_alertes.append({
+                "level": "critical", "diagnostic": "qualite", "type": "alerte",
+                "message": f"Sharpe négatif ou nul ({sharpe:.2f}) : le rendement moyen ne compense même pas la volatilité prise -- sur cette mesure, la stratégie n'a pas d'avantage statistique démontré."
+            })
+        elif sharpe is not None and sharpe < 1.0:
+            toutes_les_alertes.append({
+                "level": "warning", "diagnostic": "qualite", "type": "alerte",
+                "message": f"Sharpe faible ({sharpe:.2f}) : le rendement obtenu reste modeste par rapport à la volatilité subie pour l'obtenir."
+            })
+
+        sortino = ratios_performance.get("sortino_ratio")
+        if sortino is not None and sortino <= 0:
+            toutes_les_alertes.append({
+                "level": "critical", "diagnostic": "qualite", "type": "alerte",
+                "message": f"Sortino négatif ou nul ({sortino:.2f}) : même en ne comptant que la volatilité défavorable (les pertes), le rendement ne compense pas le risque prix."
+            })
+
+        calmar = ratios_performance.get("calmar_ratio")
+        if calmar is not None and calmar <= 0.5:
+            toutes_les_alertes.append({
+                "level": "warning", "diagnostic": "qualite", "type": "alerte",
+                "message": f"Calmar faible ({calmar:.2f}) : le rendement obtenu ne justifie pas vraiment le pire drawdown traversé pour l'obtenir."
+            })
+
+        excess = ratios_performance.get("excess_return_vs_benchmark_pct")
+        if excess is not None and excess <= 0:
+            toutes_les_alertes.append({
+                "level": "warning", "diagnostic": "qualite", "type": "alerte",
+                "message": f"Sous-performance vs le benchmark renseigné ({excess:+.1f}%) : cette stratégie fait moins bien qu'un simple achat-conservation sur la même période -- le risque et l'effort supplémentaires ne semblent pas récompensés."
+            })
+
+        expectancy_r = qualite_perf_res.get("expectancy_r_utilise")
+        if expectancy_r is not None and expectancy_r <= 0:
+            toutes_les_alertes.append({
+                "level": "critical", "diagnostic": "qualite", "type": "alerte",
+                "message": f"Espérance de gain négative ou nulle ({expectancy_r:.3f}R par trade) : en moyenne, chaque trade coûte plus qu'il ne rapporte -- c'est le signal le plus direct qu'il n'y a pas d'edge démontré, indépendamment du Profit Factor ou des autres ratios."
+            })
     if risque_res is not None and risque_res.get("mdd_source") == "calcule":
         toutes_les_alertes.append({
             "level": "info", "diagnostic": "risque", "type": "recommandation",
