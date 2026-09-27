@@ -317,6 +317,24 @@ def init_db():
     if 'notes' not in cols_epreuve_trades:
         conn.execute("ALTER TABLE epreuve_trades ADD COLUMN notes TEXT")
 
+    # Migration : nouveaux champs pour le mode Suivi (remplace l'ancien
+    # mode Validation) -- un seuil d'alerte interne plus serré que les
+    # contraintes dures, un nombre minimum de trades avant de pouvoir
+    # juger quoi que ce soit, une fenêtre glissante pour juger la
+    # tendance récente plutôt que tout l'historique, et un contexte
+    # libre (nom de la prop firm ou "personnel").
+    cols_epreuves_suivi = [r[1] for r in conn.execute("PRAGMA table_info(epreuves)").fetchall()]
+    if 'seuil_alerte_drawdown_pct' not in cols_epreuves_suivi:
+        conn.execute("ALTER TABLE epreuves ADD COLUMN seuil_alerte_drawdown_pct REAL")
+    if 'nb_trades_min_jugement' not in cols_epreuves_suivi:
+        conn.execute("ALTER TABLE epreuves ADD COLUMN nb_trades_min_jugement INTEGER")
+    if 'duree_min_jours_jugement' not in cols_epreuves_suivi:
+        conn.execute("ALTER TABLE epreuves ADD COLUMN duree_min_jours_jugement INTEGER")
+    if 'taille_fenetre_glissante' not in cols_epreuves_suivi:
+        conn.execute("ALTER TABLE epreuves ADD COLUMN taille_fenetre_glissante INTEGER")
+    if 'contexte' not in cols_epreuves_suivi:
+        conn.execute("ALTER TABLE epreuves ADD COLUMN contexte TEXT")
+
     # ============================================================
     # STRATÉGIES — une vraie identité persistante, distincte des analyses.
     # Avant, "bot_name" n'était qu'un texte libre répété sur chaque ligne
@@ -4390,6 +4408,146 @@ def evaluer_epreuve(epreuve, trades, periode_ecoulee=False):
     }
 
 
+def calculer_statut_suivi(epreuve, trades, fourchette_originale=None):
+    """
+    Statut continu à 3 états pour le mode Suivi (remplace le
+    pass/fail figé du mode Validation) : "sain", "a_surveiller",
+    "coupe". Contrairement à evaluer_epreuve, il n'y a pas de date de
+    fin -- le jugement est toujours "en ce moment", recalculé à
+    chaque nouveau trade.
+
+    epreuve : dict avec capital_initial, et les seuils optionnels
+              drawdown_max_pct (dur, ex. règle FTMO), perte_quotidienne_max_pct
+              (dur), seuil_alerte_drawdown_pct (souple, propre à
+              l'utilisateur), nb_trades_min_jugement, duree_min_jours_jugement,
+              taille_fenetre_glissante (en nombre de trades).
+    trades : liste de dicts {date, profit}.
+    fourchette_originale : {p10, p90} du score bootstrap de l'analyse XTRUNN
+              d'origine, si ce suivi est lié à une analyse -- sert de
+              référence externe en plus des seuils déclarés par l'utilisateur.
+    """
+    capital = epreuve["capital_initial"]
+    trades_tries = sorted(trades, key=lambda t: t["date"])
+    n_trades = len(trades_tries)
+
+    if n_trades == 0:
+        return {
+            "statut": "sain", "raisons": [], "donnees_suffisantes": False,
+            "profit_pct": 0.0, "profit_net": 0.0, "drawdown_pct": 0.0,
+            "drawdown_dollars": 0.0, "pire_jour_pct": 0.0, "jours_trading": 0,
+            "n_trades": 0, "courbe": [capital],
+            "fenetre_glissante": None,
+        }
+
+    courbe = [capital]
+    cumul = capital
+    for t in trades_tries:
+        cumul += t["profit"]
+        courbe.append(cumul)
+
+    pic = capital
+    max_dd_pct = 0.0
+    max_dd_dollars = 0.0
+    for v in courbe:
+        pic = max(pic, v)
+        dd_dollars = pic - v
+        dd_pct = (dd_dollars / pic * 100) if pic > 0 else 0.0
+        if dd_pct > max_dd_pct:
+            max_dd_pct = dd_pct
+            max_dd_dollars = dd_dollars
+
+    profit_net = courbe[-1] - capital
+    profit_pct = (profit_net / capital * 100) if capital > 0 else 0.0
+
+    par_jour = {}
+    for t in trades_tries:
+        par_jour.setdefault(t["date"], 0.0)
+        par_jour[t["date"]] += t["profit"]
+    pire_jour_dollars = min(par_jour.values()) if par_jour else 0.0
+    pire_jour_pct = (pire_jour_dollars / capital * 100) if capital > 0 else 0.0
+    jours_trading = len(par_jour)
+
+    # --- Priorité 1 : contraintes dures -- jamais négociables, jamais
+    # adoucies par le manque de données ou par une fenêtre glissante
+    # favorable. Si l'une d'elles est franchie, le statut est "coupe"
+    # sans condition supplémentaire.
+    raisons_coupe = []
+    if epreuve.get("drawdown_max_pct") and max_dd_pct >= epreuve["drawdown_max_pct"]:
+        raisons_coupe.append(f"Drawdown maximal autorisé dépassé : {max_dd_pct:.1f}% (limite dure : {epreuve['drawdown_max_pct']:.0f}%).")
+    if (epreuve.get("perte_quotidienne_max_pct") and pire_jour_pct < 0
+            and abs(pire_jour_pct) >= epreuve["perte_quotidienne_max_pct"]):
+        raisons_coupe.append(f"Perte quotidienne maximale autorisée dépassée : {abs(pire_jour_pct):.1f}% en une seule journée (limite dure : {epreuve['perte_quotidienne_max_pct']:.0f}%).")
+
+    if raisons_coupe:
+        return {
+            "statut": "coupe", "raisons": raisons_coupe, "donnees_suffisantes": True,
+            "profit_pct": round(profit_pct, 2), "profit_net": round(profit_net, 2),
+            "drawdown_pct": round(max_dd_pct, 2), "drawdown_dollars": round(max_dd_dollars, 2),
+            "pire_jour_pct": round(pire_jour_pct, 2), "jours_trading": jours_trading,
+            "n_trades": n_trades, "courbe": [round(v, 2) for v in courbe],
+            "fenetre_glissante": None,
+        }
+
+    # --- Priorité 2 : assez de données pour juger le reste ? En dessous
+    # du minimum déclaré, on reste "sain" par défaut plutôt que
+    # d'inventer un jugement sur un échantillon trop petit pour être
+    # autre chose que du bruit -- mais on le signale honnêtement.
+    nb_min = epreuve.get("nb_trades_min_jugement")
+    duree_min = epreuve.get("duree_min_jours_jugement")
+    donnees_suffisantes = (not nb_min or n_trades >= nb_min) and (not duree_min or jours_trading >= duree_min)
+
+    fenetre_stats = None
+    taille_fenetre = epreuve.get("taille_fenetre_glissante")
+    if taille_fenetre and n_trades >= 1:
+        fenetre = trades_tries[-taille_fenetre:]
+        gains_fenetre = sum(t["profit"] for t in fenetre if t["profit"] > 0)
+        pertes_fenetre = abs(sum(t["profit"] for t in fenetre if t["profit"] < 0))
+        pf_fenetre = (gains_fenetre / pertes_fenetre) if pertes_fenetre > 0 else (float("inf") if gains_fenetre > 0 else None)
+        winrate_fenetre = sum(1 for t in fenetre if t["profit"] > 0) / len(fenetre) * 100
+        fenetre_stats = {
+            "n_trades_fenetre": len(fenetre),
+            "profit_factor_fenetre": round(pf_fenetre, 2) if pf_fenetre is not None and pf_fenetre != float("inf") else None,
+            "winrate_fenetre_pct": round(winrate_fenetre, 1),
+        }
+
+    if not donnees_suffisantes:
+        return {
+            "statut": "sain", "raisons": [], "donnees_suffisantes": False,
+            "profit_pct": round(profit_pct, 2), "profit_net": round(profit_net, 2),
+            "drawdown_pct": round(max_dd_pct, 2), "drawdown_dollars": round(max_dd_dollars, 2),
+            "pire_jour_pct": round(pire_jour_pct, 2), "jours_trading": jours_trading,
+            "n_trades": n_trades, "courbe": [round(v, 2) for v in courbe],
+            "fenetre_glissante": fenetre_stats,
+        }
+
+    # --- Priorité 3 : seuil d'alerte interne (souple, propre à
+    # l'utilisateur) et dégradation de la fenêtre glissante récente --
+    # ne coupe rien, signale seulement qu'il est temps de surveiller
+    # de plus près ou de réduire la taille des positions.
+    raisons_surveillance = []
+    if epreuve.get("seuil_alerte_drawdown_pct") and max_dd_pct >= epreuve["seuil_alerte_drawdown_pct"]:
+        raisons_surveillance.append(f"Drawdown actuel ({max_dd_pct:.1f}%) a franchi votre seuil d'alerte personnel ({epreuve['seuil_alerte_drawdown_pct']:.0f}%), sans avoir atteint la limite dure.")
+    if fenetre_stats and fenetre_stats["profit_factor_fenetre"] is not None and fenetre_stats["profit_factor_fenetre"] < 1.0:
+        raisons_surveillance.append(f"Sur les {fenetre_stats['n_trades_fenetre']} derniers trades, le Profit Factor est tombé sous 1 ({fenetre_stats['profit_factor_fenetre']}) -- la stratégie perd de l'argent récemment, même si le résultat global reste positif.")
+    if fourchette_originale and fourchette_originale.get("p10") is not None:
+        # Comparaison au P10 du bootstrap d'origine : si le profit réel
+        # tombe sous ce que même un scénario pessimiste plausible du
+        # backtest annonçait, c'est un signal de décalage, pas juste de
+        # malchance ordinaire.
+        pass  # nécessite une échelle comparable (score vs profit) -- affiné plus tard, gardé en réserve pour l'instant
+
+    statut = "a_surveiller" if raisons_surveillance else "sain"
+
+    return {
+        "statut": statut, "raisons": raisons_surveillance, "donnees_suffisantes": True,
+        "profit_pct": round(profit_pct, 2), "profit_net": round(profit_net, 2),
+        "drawdown_pct": round(max_dd_pct, 2), "drawdown_dollars": round(max_dd_dollars, 2),
+        "pire_jour_pct": round(pire_jour_pct, 2), "jours_trading": jours_trading,
+        "n_trades": n_trades, "courbe": [round(v, 2) for v in courbe],
+        "fenetre_glissante": fenetre_stats,
+    }
+
+
 # ============================================================
 # ENDPOINTS HISTORIQUE
 # ============================================================
@@ -5109,14 +5267,20 @@ def _construire_etat_epreuve(epreuve_row, trades_rows):
 
     if epreuve["type_epreuve"] == "validation":
         evaluation = evaluer_epreuve_validation(epreuve, trades, periode_ecoulee)
+    elif epreuve["type_epreuve"] == "suivi":
+        # Pas de fourchette bootstrap d'origine branchée pour l'instant
+        # (voir calculer_statut_suivi) -- réservé pour une prochaine étape.
+        evaluation = calculer_statut_suivi(epreuve, trades)
     else:
         evaluation = evaluer_epreuve(epreuve, trades, periode_ecoulee)
     statut_stocke = epreuve["statut"]
     epreuve.update(evaluation)
     # Le statut stocké fait autorité s'il a déjà été figé (réussi, échoué,
     # abandonné) -- une réévaluation dynamique ne doit jamais revenir en
-    # arrière sur un verdict déjà acté ou un abandon volontaire.
-    if statut_stocke != "en_cours":
+    # arrière sur un verdict déjà acté ou un abandon volontaire. Le Suivi
+    # est une exception délibérée : il n'a pas de verdict figé, son
+    # statut est toujours celui recalculé à l'instant présent.
+    if statut_stocke != "en_cours" and epreuve["type_epreuve"] != "suivi":
         epreuve["statut"] = statut_stocke
 
     jours_ecoules = max(0, (maintenant - date_debut).days)
@@ -5160,6 +5324,11 @@ class EpreuveCreation(BaseModel):
     strategie_id: int = None
     analyse_id: int = None
     type_epreuve: str = "personnalise"
+    seuil_alerte_drawdown_pct: float = None
+    nb_trades_min_jugement: int = None
+    duree_min_jours_jugement: int = None
+    taille_fenetre_glissante: int = None
+    contexte: str = None
 
 
 # Règlement standardisé du "Epreuve XTRUNN" -- un jeu de règles fixe,
@@ -5192,6 +5361,48 @@ async def creer_epreuve(payload: EpreuveCreation):
         perte_quotidienne_max_pct = regles["perte_quotidienne_max_pct"]
         consistency_max_pct = regles["consistency_max_pct"]
         jours_min_trading = regles["jours_min_trading"]
+    elif payload.type_epreuve == "suivi":
+        # Le mode Suivi n'impose aucune porte de score ni d'analyse
+        # obligatoire -- une stratégie avec un score bas a probablement
+        # encore plus besoin d'un suivi strict qu'une bonne, pas moins.
+        # Durée non fixée (surveillance continue) : une valeur très
+        # longue plutôt qu'une vraie fin, le champ existant en base
+        # restant NOT NULL.
+        duree_jours = 36500
+        objectif_profit_pct = payload.objectif_profit_pct
+        drawdown_max_pct = payload.drawdown_max_pct
+        perte_quotidienne_max_pct = payload.perte_quotidienne_max_pct
+        consistency_max_pct = None
+        jours_min_trading = None
+
+        if payload.analyse_id is not None:
+            conn_verif = get_db()
+            analyse_verif = conn_verif.execute(
+                "SELECT strategie_id, resultat_json FROM analyses WHERE id = ?", (payload.analyse_id,)
+            ).fetchone()
+            conn_verif.close()
+            if analyse_verif is None:
+                raise HTTPException(status_code=404, detail="Analyse introuvable.")
+            resultat_analyse = json.loads(analyse_verif["resultat_json"])
+            if payload.strategie_id is None:
+                payload.strategie_id = analyse_verif["strategie_id"]
+            if not payload.capital_initial:
+                payload.capital_initial = resultat_analyse.get("capital_initial")
+            if not payload.nom or not payload.nom.strip():
+                conn_nom = get_db()
+                strat_nom_row = conn_nom.execute("SELECT nom FROM strategies WHERE id = ?", (payload.strategie_id,)).fetchone()
+                conn_nom.close()
+                nom_strategie = strat_nom_row["nom"] if strat_nom_row else "Stratégie"
+                payload.nom = f"Suivi — {nom_strategie}"
+            # Suggestion, jamais imposée : si l'utilisateur n'a pas donné
+            # son propre seuil souple, on en propose un à partir du pire
+            # Max Drawdown déjà simulé par Monte Carlo pour cette analyse
+            # précise -- reste modifiable, jamais calculé à sa place.
+            if payload.seuil_alerte_drawdown_pct is None:
+                mc = resultat_analyse.get("monte_carlo", {})
+                pire_mdd_pct = mc.get("pire_mdd_95_pct")
+                if pire_mdd_pct is not None:
+                    payload.seuil_alerte_drawdown_pct = round(abs(pire_mdd_pct), 1)
     elif payload.type_epreuve == "validation":
         # Aucune règle fixée par XTRUNN ni par l'utilisateur -- tout est
         # dérivé du backtest de l'analyse liée, qui devient obligatoire.
@@ -5276,14 +5487,18 @@ async def creer_epreuve(payload: EpreuveCreation):
         INSERT INTO epreuves
             (nom, strategie_id, analyse_id, capital_initial, objectif_profit_pct, drawdown_max_pct,
              perte_quotidienne_max_pct, consistency_max_pct, jours_min_trading, duree_jours,
-             type_epreuve, date_debut, date_fin, statut, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'en_cours', ?)
+             type_epreuve, date_debut, date_fin, statut, created_at,
+             seuil_alerte_drawdown_pct, nb_trades_min_jugement, duree_min_jours_jugement,
+             taille_fenetre_glissante, contexte)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'en_cours', ?, ?, ?, ?, ?, ?)
         """,
         (
             payload.nom.strip(), payload.strategie_id, payload.analyse_id, payload.capital_initial,
             objectif_profit_pct, drawdown_max_pct, perte_quotidienne_max_pct,
             consistency_max_pct, jours_min_trading, duree_jours,
             payload.type_epreuve, date_debut.isoformat(), date_fin.isoformat(), date_debut.isoformat(),
+            payload.seuil_alerte_drawdown_pct, payload.nb_trades_min_jugement,
+            payload.duree_min_jours_jugement, payload.taille_fenetre_glissante, payload.contexte,
         )
     )
     conn.commit()
