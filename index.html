@@ -3445,6 +3445,70 @@
         </div>
     </div>
 
+    <div id="modalConfigurerSuivi" class="modal-overlay" style="display:none;" onclick="if(event.target===this) fermerModalConfigurerSuivi()">
+        <div class="modal-content">
+            <button class="modal-close" onclick="fermerModalConfigurerSuivi()">✕</button>
+            <div class="modal-title">Configurer un Suivi</div>
+            <p class="modal-subtitle" id="modalSuiviSubtitle">Fixez les seuils à respecter avant de commencer -- ils ne changeront plus après, pour éviter de les ajuster après coup selon comment ça se passe.</p>
+
+            <div class="input-group">
+                <label>Nom</label>
+                <input type="text" id="modalSuiviNom" placeholder="ex. FTMO 10k -- Stratégie A">
+            </div>
+            <div style="display:flex; gap:15px;">
+                <div class="input-group" style="flex:1;">
+                    <label>Capital de Départ</label>
+                    <input type="number" id="modalSuiviCapital" placeholder="10000">
+                </div>
+                <div class="input-group" style="flex:1;">
+                    <label>Contexte <span class="info-tip" data-tip="Libre -- le nom de la prop firm si applicable (ex. FTMO), ou &quot;Compte personnel&quot;. Sert juste à t'y retrouver si tu suis plusieurs stratégies avec des règles différentes en même temps.">?</span></label>
+                    <input type="text" id="modalSuiviContexte" placeholder="ex. FTMO, ou Personnel">
+                </div>
+            </div>
+
+            <div class="panel-title" style="font-size:0.72rem; margin-top:18px;">Contraintes Dures <span class="info-tip" data-tip="Des murs absolus, jamais négociables -- si une plateforme externe (prop firm, courtier) te les impose. Laisse vide si aucune ne s'applique.">?</span></div>
+            <div style="display:flex; gap:15px;">
+                <div class="input-group" style="flex:1;">
+                    <label>Drawdown Max (%)</label>
+                    <input type="number" id="modalSuiviDrawdownMax" placeholder="ex. 10" step="0.5">
+                </div>
+                <div class="input-group" style="flex:1;">
+                    <label>Perte Journalière Max (%)</label>
+                    <input type="number" id="modalSuiviPerteJourMax" placeholder="ex. 5" step="0.5">
+                </div>
+                <div class="input-group" style="flex:1;">
+                    <label>Objectif de Profit (%) <span style="text-transform:none; letter-spacing:0; opacity:0.7;">(optionnel)</span></label>
+                    <input type="number" id="modalSuiviObjectifProfit" placeholder="ex. 10" step="0.5">
+                </div>
+            </div>
+
+            <div class="panel-title" style="font-size:0.72rem; margin-top:18px;">Votre Seuil de Sécurité <span class="info-tip" data-tip="Plus serré que le mur ci-dessus, pour avoir de la marge de réaction avant de le toucher. Suggéré automatiquement à partir du pire Max Drawdown déjà simulé par Monte Carlo si ce suivi est lié à une analyse -- reste modifiable.">?</span></div>
+            <div class="input-group">
+                <label>Seuil d'Alerte Interne -- Drawdown (%)</label>
+                <input type="number" id="modalSuiviSeuilAlerte" placeholder="ex. 6" step="0.5">
+            </div>
+
+            <div class="panel-title" style="font-size:0.72rem; margin-top:18px;">Avant de Pouvoir Juger <span class="info-tip" data-tip="En dessous de ces minimums, le statut reste &quot;Sain&quot; par défaut plutôt que d'inventer un jugement sur un échantillon trop petit pour être autre chose que du bruit.">?</span></div>
+            <div style="display:flex; gap:15px;">
+                <div class="input-group" style="flex:1;">
+                    <label>Nombre de Trades Minimum</label>
+                    <input type="number" id="modalSuiviNbTradesMin" placeholder="ex. 20" step="1">
+                </div>
+                <div class="input-group" style="flex:1;">
+                    <label>Jours Minimum <span style="text-transform:none; letter-spacing:0; opacity:0.7;">(optionnel)</span></label>
+                    <input type="number" id="modalSuiviDureeMin" placeholder="ex. 10" step="1">
+                </div>
+                <div class="input-group" style="flex:1;">
+                    <label>Fenêtre Glissante <span class="info-tip" data-tip="Nombre de trades les plus récents utilisés pour juger la tendance actuelle, séparément de l'historique complet.">?</span></label>
+                    <input type="number" id="modalSuiviFenetreGlissante" placeholder="ex. 15" step="1">
+                </div>
+            </div>
+
+            <div id="modalSuiviError" class="error-msg" style="display:none; margin-top:14px;"></div>
+            <button class="btn-analyser" style="width:100%; margin-top:18px;" id="modalSuiviBtn" onclick="lancerCreationSuivi()">Démarrer le Suivi</button>
+        </div>
+    </div>
+
     <script>
         // Couleurs de graphique adaptées au thème -- les grilles et
         // lignes neutres étaient codées en blanc translucide, invisibles
@@ -5761,30 +5825,118 @@
         // glisser-déposer sur le nœud (desktop) ou via le bouton dédié
         // sur la carte (partout, y compris là où le sélecteur orbital
         // n'est pas visible, comme sur mobile ou en portrait).
+        // Point d'entrée partagé pour démarrer un Suivi à partir d'une
+        // analyse -- que ce soit via le glisser-déposer sur le nœud
+        // (desktop) ou via le bouton dédié sur la carte (partout, y
+        // compris là où le sélecteur orbital n'est pas visible, comme
+        // sur mobile ou en portrait). Le dépôt ouvre maintenant la
+        // configuration des seuils plutôt que de lancer immédiatement --
+        // contrairement à l'ancienne Validation Officielle, un Suivi a
+        // toujours besoin des seuils propres à l'utilisateur.
         async function envoyerEnValidation(analyseId) {
+            dragSuppressionClicProchain = false;
+            await ouvrirModalConfigurerSuivi(analyseId);
+        }
+
+        let suiviAnalyseIdCourante = null;
+        let suiviStrategieIdCourante = null;
+
+        async function ouvrirModalConfigurerSuivi(analyseId) {
+            suiviAnalyseIdCourante = analyseId || null;
+            suiviStrategieIdCourante = null;
+            document.getElementById('modalSuiviNom').value = '';
+            document.getElementById('modalSuiviCapital').value = '';
+            document.getElementById('modalSuiviContexte').value = '';
+            document.getElementById('modalSuiviObjectifProfit').value = '';
+            document.getElementById('modalSuiviDrawdownMax').value = '';
+            document.getElementById('modalSuiviPerteJourMax').value = '';
+            document.getElementById('modalSuiviSeuilAlerte').value = '';
+            document.getElementById('modalSuiviNbTradesMin').value = '';
+            document.getElementById('modalSuiviDureeMin').value = '';
+            document.getElementById('modalSuiviFenetreGlissante').value = '';
+            document.getElementById('modalSuiviError').style.display = 'none';
+
+            if (analyseId) {
+                try {
+                    const resp = await fetch('http://127.0.0.1:8000/historique/' + analyseId);
+                    const data = await resp.json();
+                    const resultat = data.resultat;
+                    suiviStrategieIdCourante = data.strategie_id;
+                    document.getElementById('modalSuiviNom').value = `Suivi — ${data.bot_name || 'Stratégie'}`;
+                    document.getElementById('modalSuiviCapital').value = resultat.capital_initial || '';
+                    const pireMdd = resultat.monte_carlo && resultat.monte_carlo.pire_mdd_95_pct;
+                    if (pireMdd !== null && pireMdd !== undefined) {
+                        document.getElementById('modalSuiviSeuilAlerte').value = Math.abs(Math.round(pireMdd * 10) / 10);
+                        document.getElementById('modalSuiviSubtitle').textContent = `Seuil d'alerte pré-rempli à partir du pire Max Drawdown déjà simulé pour cette stratégie (${Math.abs(pireMdd).toFixed(1)}%) -- reste modifiable avant de démarrer.`;
+                    }
+                } catch (err) {
+                    // Le formulaire reste utilisable même si le pré-remplissage échoue.
+                }
+            } else {
+                document.getElementById('modalSuiviSubtitle').textContent = "Fixez les seuils à respecter avant de commencer -- ils ne changeront plus après, pour éviter de les ajuster après coup selon comment ça se passe.";
+            }
+
+            ouvrirModaleAnimee('modalConfigurerSuivi');
+        }
+
+        function fermerModalConfigurerSuivi() {
+            fermerModaleAnimee('modalConfigurerSuivi');
+        }
+
+        async function lancerCreationSuivi() {
+            const erreurBox = document.getElementById('modalSuiviError');
+            erreurBox.style.display = 'none';
+
+            const nom = document.getElementById('modalSuiviNom').value.trim();
+            const capital = parseFloat(document.getElementById('modalSuiviCapital').value);
+            if (!capital || capital <= 0) {
+                erreurBox.textContent = "Le capital de départ est requis.";
+                erreurBox.style.display = 'block';
+                return;
+            }
+
+            const val = (id) => {
+                const v = document.getElementById(id).value;
+                return v === '' ? null : parseFloat(v);
+            };
+            const valInt = (id) => {
+                const v = document.getElementById(id).value;
+                return v === '' ? null : parseInt(v, 10);
+            };
+
+            const payload = {
+                type_epreuve: 'suivi',
+                nom: nom || null,
+                capital_initial: capital,
+                analyse_id: suiviAnalyseIdCourante,
+                strategie_id: suiviStrategieIdCourante,
+                contexte: document.getElementById('modalSuiviContexte').value.trim() || null,
+                objectif_profit_pct: val('modalSuiviObjectifProfit'),
+                drawdown_max_pct: val('modalSuiviDrawdownMax'),
+                perte_quotidienne_max_pct: val('modalSuiviPerteJourMax'),
+                seuil_alerte_drawdown_pct: val('modalSuiviSeuilAlerte'),
+                nb_trades_min_jugement: valInt('modalSuiviNbTradesMin'),
+                duree_min_jours_jugement: valInt('modalSuiviDureeMin'),
+                taille_fenetre_glissante: valInt('modalSuiviFenetreGlissante'),
+            };
+
             try {
-                // Le dépôt EST le lancement -- plus d'étape intermédiaire
-                // "en attente" à gérer, puisque seule une analyse déjà
-                // éligible peut arriver jusqu'ici.
                 const resp = await fetch('http://127.0.0.1:8000/epreuves', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ analyse_id: analyseId, type_epreuve: 'validation' })
+                    body: JSON.stringify(payload)
                 });
                 const data = await resp.json();
-                if (!resp.ok) { alert(data.detail || "Erreur lors du lancement de la Validation."); return; }
-                // Cet appel-ci est intentionnel, pas un clic accidentel
-                // qui aurait suivi le glissement -- la protection ne
-                // doit pas le bloquer, sinon la navigation vers le
-                // nouveau parcours ne se produit jamais.
-                dragSuppressionClicProchain = false;
+                if (!resp.ok) {
+                    erreurBox.textContent = data.detail || "Erreur lors de la création du suivi.";
+                    erreurBox.style.display = 'block';
+                    return;
+                }
+                fermerModalConfigurerSuivi();
                 basculerModeAccueil('validation_officielle');
-                // La bascule de mode swap son contenu de façon différée
-                // (~400ms) -- ouvrir l'épreuve avant que ce délai soit
-                // passé ferait écraser la navigation par ce switch une
-                // fois qu'il se termine enfin.
                 setTimeout(() => ouvrirEpreuve(data.id), 500);
             } catch (err) {
-                alert("Erreur lors de l'envoi vers la Validation Officielle.");
+                erreurBox.textContent = "Erreur réseau lors de la création du suivi.";
+                erreurBox.style.display = 'block';
             }
         }
 
