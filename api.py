@@ -5313,22 +5313,22 @@ def _construire_etat_epreuve(epreuve_row, trades_rows):
 
 
 class EpreuveCreation(BaseModel):
-    nom: str = None
-    capital_initial: float = None
+    nom: str | None = None
+    capital_initial: float | None = None
     duree_jours: int = 30
-    objectif_profit_pct: float = None
-    drawdown_max_pct: float = None
-    perte_quotidienne_max_pct: float = None
-    consistency_max_pct: float = None
-    jours_min_trading: int = None
-    strategie_id: int = None
-    analyse_id: int = None
+    objectif_profit_pct: float | None = None
+    drawdown_max_pct: float | None = None
+    perte_quotidienne_max_pct: float | None = None
+    consistency_max_pct: float | None = None
+    jours_min_trading: int | None = None
+    strategie_id: int | None = None
+    analyse_id: int | None = None
     type_epreuve: str = "personnalise"
-    seuil_alerte_drawdown_pct: float = None
-    nb_trades_min_jugement: int = None
-    duree_min_jours_jugement: int = None
-    taille_fenetre_glissante: int = None
-    contexte: str = None
+    seuil_alerte_drawdown_pct: float | None = None
+    nb_trades_min_jugement: int | None = None
+    duree_min_jours_jugement: int | None = None
+    taille_fenetre_glissante: int | None = None
+    contexte: str | None = None
 
 
 # Règlement standardisé du "Epreuve XTRUNN" -- un jeu de règles fixe,
