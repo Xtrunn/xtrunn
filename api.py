@@ -4473,10 +4473,10 @@ def calculer_statut_suivi(epreuve, trades, fourchette_originale=None):
     # sans condition supplémentaire.
     raisons_coupe = []
     if epreuve.get("drawdown_max_pct") and max_dd_pct >= epreuve["drawdown_max_pct"]:
-        raisons_coupe.append(f"Drawdown maximal autorisé dépassé : {max_dd_pct:.1f}% (limite dure : {epreuve['drawdown_max_pct']:.0f}%).")
+        raisons_coupe.append(f"Drawdown maximal autorisé dépassé : {max_dd_pct:.2f}% (limite dure : {epreuve['drawdown_max_pct']:.0f}%).")
     if (epreuve.get("perte_quotidienne_max_pct") and pire_jour_pct < 0
             and abs(pire_jour_pct) >= epreuve["perte_quotidienne_max_pct"]):
-        raisons_coupe.append(f"Perte quotidienne maximale autorisée dépassée : {abs(pire_jour_pct):.1f}% en une seule journée (limite dure : {epreuve['perte_quotidienne_max_pct']:.0f}%).")
+        raisons_coupe.append(f"Perte quotidienne maximale autorisée dépassée : {abs(pire_jour_pct):.2f}% en une seule journée (limite dure : {epreuve['perte_quotidienne_max_pct']:.0f}%).")
 
     if raisons_coupe:
         return {
@@ -4526,7 +4526,7 @@ def calculer_statut_suivi(epreuve, trades, fourchette_originale=None):
     # de plus près ou de réduire la taille des positions.
     raisons_surveillance = []
     if epreuve.get("seuil_alerte_drawdown_pct") and max_dd_pct >= epreuve["seuil_alerte_drawdown_pct"]:
-        raisons_surveillance.append(f"Drawdown actuel ({max_dd_pct:.1f}%) a franchi votre seuil d'alerte personnel ({epreuve['seuil_alerte_drawdown_pct']:.0f}%), sans avoir atteint la limite dure.")
+        raisons_surveillance.append(f"Drawdown max atteint ({max_dd_pct:.2f}%) a franchi votre seuil d'alerte personnel ({epreuve['seuil_alerte_drawdown_pct']:.0f}%), sans avoir atteint la limite dure.")
     if fenetre_stats and fenetre_stats["profit_factor_fenetre"] is not None and fenetre_stats["profit_factor_fenetre"] < 1.0:
         raisons_surveillance.append(f"Sur les {fenetre_stats['n_trades_fenetre']} derniers trades, le Profit Factor est tombé sous 1 ({fenetre_stats['profit_factor_fenetre']}) -- la stratégie perd de l'argent récemment, même si le résultat global reste positif.")
     if fourchette_originale and fourchette_originale.get("p10") is not None:
@@ -5691,6 +5691,29 @@ async def importer_trades_epreuve(
 
     conn = get_db()
     n_ajoutes = 0
+    n_doublons = 0
+
+    # Pour un Suivi, l'utilisateur ré-importe régulièrement l'historique
+    # COMPLET plutôt que seulement les nouveaux trades -- sans
+    # déduplication, chaque ré-import doublerait tout et fausserait le
+    # drawdown. Par ticket quand la plateforme en fournit un ; sinon par
+    # (date, profit), en comptant les occurrences pour ne pas confondre
+    # deux vrais trades identiques le même jour avec un doublon.
+    dedupliquer = row["type_epreuve"] == "suivi"
+    tickets_existants = set()
+    compteur_existant = {}
+    if dedupliquer:
+        existants = conn.execute(
+            "SELECT ticket, date, profit FROM epreuve_trades WHERE epreuve_id = ?", (epreuve_id,)
+        ).fetchall()
+        for e in existants:
+            if e["ticket"] not in (None, ""):
+                tickets_existants.add(str(e["ticket"]))
+            else:
+                cle = (e["date"], round(float(e["profit"]), 2))
+                compteur_existant[cle] = compteur_existant.get(cle, 0) + 1
+    compteur_fichier = {}
+
     for d in detail_list:
         date_brute = d.get("date")
         if not date_brute:
@@ -5702,14 +5725,33 @@ async def importer_trades_epreuve(
             date_parsee = parsed_date.iloc[0].strftime("%Y-%m-%d")
         except Exception:
             continue
+        profit_val = float(d.get("profit", 0.0))
+        ticket_val = d.get("ticket")
+
+        if dedupliquer:
+            if ticket_val not in (None, ""):
+                if str(ticket_val) in tickets_existants:
+                    n_doublons += 1
+                    continue
+                tickets_existants.add(str(ticket_val))
+            else:
+                cle = (date_parsee, round(profit_val, 2))
+                compteur_fichier[cle] = compteur_fichier.get(cle, 0) + 1
+                if compteur_fichier[cle] <= compteur_existant.get(cle, 0):
+                    n_doublons += 1
+                    continue
+
         conn.execute(
             "INSERT INTO epreuve_trades (epreuve_id, date, profit, ticket, source, created_at) VALUES (?, ?, ?, ?, 'import_fichier', ?)",
-            (epreuve_id, date_parsee, float(d.get("profit", 0.0)), d.get("ticket"), datetime.now(timezone.utc).isoformat())
+            (epreuve_id, date_parsee, profit_val, ticket_val, datetime.now(timezone.utc).isoformat())
         )
         n_ajoutes += 1
     conn.commit()
     conn.close()
-    return {"message": f"{n_ajoutes} trade(s) importé(s).", "n_ajoutes": n_ajoutes}
+    message = f"{n_ajoutes} trade(s) importé(s)."
+    if n_doublons:
+        message += f" {n_doublons} déjà présent(s), ignoré(s)."
+    return {"message": message, "n_ajoutes": n_ajoutes, "n_doublons": n_doublons}
 
 
 @app.delete("/epreuves/{epreuve_id}/trades/{trade_id}")
