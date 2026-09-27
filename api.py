@@ -1118,7 +1118,7 @@ def analyser_pilier_is_oos(fenetres, oos_trades_all):
         score = int(score * MULT_PENALITE_INCOHERENCE)
         warnings.append({
             "level": "warning",
-            "message": f"Résultats inégaux selon les périodes testées : {fenetres_faibles_pct:.0f}% d'entre elles montrent un net surapprentissage, malgré une moyenne correcte. La performance ne semble pas également reproductible dans le temps."
+            "message": f"Résultats inégaux selon les périodes testées : {fenetres_faibles_pct:.0f}% d'entre elles sont individuellement faibles, malgré une moyenne correcte. La performance ne semble pas également reproductible dans le temps -- si la stratégie a déjà été réglée sur cet historique, ceci peut être un signe de surapprentissage ; sinon, cela peut aussi simplement vouloir dire que l'edge recherché est irrégulier."
         })
 
     # Le Profit Factor OOS reste calculé et exposé (utilisé notamment par
