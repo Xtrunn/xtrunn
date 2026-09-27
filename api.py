@@ -5,7 +5,6 @@ import json
 import re
 import math
 import sqlite3
-import httpx
 from datetime import datetime, timezone, timedelta
 import numpy as np
 import pandas as pd
@@ -4698,6 +4697,11 @@ async def appeler_anthropic_observations(resultat, comportement=None):
     """
     if not ANTHROPIC_API_KEY:
         raise HTTPException(status_code=503, detail="Clé API Anthropic non configurée sur le serveur (variable d'environnement ANTHROPIC_API_KEY manquante).")
+
+    try:
+        import httpx
+    except ImportError:
+        raise HTTPException(status_code=503, detail="La librairie 'httpx' n'est pas installée sur ce serveur -- nécessaire uniquement pour cette fonctionnalité. Installez-la avec : pip install httpx")
 
     prompt = construire_prompt_observations(resultat, comportement)
 
