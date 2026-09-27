@@ -8710,6 +8710,14 @@ Série de pertes consécutives : ${data.risque.score_serie_pertes ?? 'N/D'} / 8
 Durée du drawdown : ${data.risque.score_duree_dd ?? 'N/D'} / 12 (${data.risque.duree_dd_jours ?? 'N/D'} jours${data.risque.duree_dd_toujours_en_cours ? ', toujours en cours à la fin de l\'historique' : ''})
 Ulcer Index : ${data.risque.score_ulcer ?? 'N/D'} / 20 (valeur : ${data.risque.ulcer_index_utilise ?? 'N/D'}, repère : < 3 excellent, 3-7 bon, 7-14 moyen, > 14 mauvais)
 
+--- DÉTAIL DES SCÉNARIOS DE STRESS DE COÛTS ---
+${(data.stress_pro_costs && data.stress_pro_costs.cost_scenarios && data.stress_pro_costs.cost_scenarios.length)
+    ? data.stress_pro_costs.cost_scenarios.map(s => `  Coûts x${s.multiplicateur} : profit net ${s.profit_net_apres_couts} ${d} (coût total ${s.cout_total} ${d}, ${s.cout_moyen_par_trade} ${d}/trade en moyenne) -- ${s.rentable ? 'rentable' : 'DÉFICITAIRE'}`).join('\n')
+    : '  N/D'}
+${(data.ventilation_instruments && data.ventilation_instruments.n_instruments > 1)
+    ? `\n--- VENTILATION PAR INSTRUMENT (${data.ventilation_instruments.n_instruments} instruments) ---\n` + data.ventilation_instruments.ventilation.map(v => `  ${v.symbole} : ${v.n_trades} trades, profit ${v.profit_total} ${d} (${v.pct_profit_total}% du profit total)`).join('\n')
+    : ''}
+
 --- ALERTES DE SANTÉ — RISQUE ---
 ${alertesRisqueTxt}
 
