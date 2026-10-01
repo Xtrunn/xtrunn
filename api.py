@@ -479,6 +479,9 @@ def init_db():
             updated_at TEXT NOT NULL
         )
     """)
+    cols_notes = [r[1] for r in conn.execute("PRAGMA table_info(notes_onglets)").fetchall()]
+    if 'epingle' not in cols_notes:
+        conn.execute("ALTER TABLE notes_onglets ADD COLUMN epingle INTEGER NOT NULL DEFAULT 0")
 
     conn.commit()
     conn.close()
@@ -4805,6 +4808,7 @@ class NoteOngletCreation(BaseModel):
 class NoteOngletMiseAJour(BaseModel):
     nom: str | None = None
     contenu: str | None = None
+    epingle: bool | None = None
 
 
 @app.get("/notes")
@@ -4840,9 +4844,10 @@ async def mettre_a_jour_note(note_id: int, payload: NoteOngletMiseAJour):
         raise HTTPException(status_code=404, detail="Onglet introuvable.")
     nouveau_nom = payload.nom.strip() if payload.nom is not None and payload.nom.strip() else row["nom"]
     nouveau_contenu = payload.contenu if payload.contenu is not None else row["contenu"]
+    nouvel_epingle = int(payload.epingle) if payload.epingle is not None else row["epingle"]
     conn.execute(
-        "UPDATE notes_onglets SET nom = ?, contenu = ?, updated_at = ? WHERE id = ?",
-        (nouveau_nom, nouveau_contenu, datetime.now(timezone.utc).isoformat(), note_id)
+        "UPDATE notes_onglets SET nom = ?, contenu = ?, epingle = ?, updated_at = ? WHERE id = ?",
+        (nouveau_nom, nouveau_contenu, nouvel_epingle, datetime.now(timezone.utc).isoformat(), note_id)
     )
     conn.commit()
     conn.close()
