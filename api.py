@@ -465,6 +465,21 @@ def init_db():
     # référence valide.
     conn.execute("DELETE FROM epreuves WHERE analyse_id NOT IN (SELECT id FROM analyses)")
 
+    # Notes libres -- un espace global, façon post-it, entièrement
+    # structuré par l'utilisateur (ses propres onglets, ses propres noms),
+    # jamais par XTRUNN. Persisté pour survivre aux redémarrages,
+    # contrairement à un brouillon de navigateur.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS notes_onglets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nom TEXT NOT NULL,
+            contenu TEXT NOT NULL DEFAULT '',
+            ordre INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -4778,6 +4793,66 @@ async def reinitialiser_donnees():
     conn = get_db()
     for table in ["epreuve_trades", "epreuves", "analyses", "strategies"]:
         conn.execute(f"DELETE FROM {table}")
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+class NoteOngletCreation(BaseModel):
+    nom: str = "Nouvel onglet"
+
+
+class NoteOngletMiseAJour(BaseModel):
+    nom: str | None = None
+    contenu: str | None = None
+
+
+@app.get("/notes")
+async def lister_notes():
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM notes_onglets ORDER BY ordre ASC, id ASC").fetchall()
+    conn.close()
+    return {"onglets": [dict(r) for r in rows]}
+
+
+@app.post("/notes")
+async def creer_note(payload: NoteOngletCreation):
+    conn = get_db()
+    max_ordre = conn.execute("SELECT COALESCE(MAX(ordre), -1) AS m FROM notes_onglets").fetchone()["m"]
+    maintenant = datetime.now(timezone.utc).isoformat()
+    cur = conn.execute(
+        "INSERT INTO notes_onglets (nom, contenu, ordre, created_at, updated_at) VALUES (?, '', ?, ?, ?)",
+        (payload.nom.strip() or "Nouvel onglet", max_ordre + 1, maintenant, maintenant)
+    )
+    conn.commit()
+    new_id = cur.lastrowid
+    row = conn.execute("SELECT * FROM notes_onglets WHERE id = ?", (new_id,)).fetchone()
+    conn.close()
+    return dict(row)
+
+
+@app.put("/notes/{note_id}")
+async def mettre_a_jour_note(note_id: int, payload: NoteOngletMiseAJour):
+    conn = get_db()
+    row = conn.execute("SELECT * FROM notes_onglets WHERE id = ?", (note_id,)).fetchone()
+    if row is None:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Onglet introuvable.")
+    nouveau_nom = payload.nom.strip() if payload.nom is not None and payload.nom.strip() else row["nom"]
+    nouveau_contenu = payload.contenu if payload.contenu is not None else row["contenu"]
+    conn.execute(
+        "UPDATE notes_onglets SET nom = ?, contenu = ?, updated_at = ? WHERE id = ?",
+        (nouveau_nom, nouveau_contenu, datetime.now(timezone.utc).isoformat(), note_id)
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+@app.delete("/notes/{note_id}")
+async def supprimer_note(note_id: int):
+    conn = get_db()
+    conn.execute("DELETE FROM notes_onglets WHERE id = ?", (note_id,))
     conn.commit()
     conn.close()
     return {"ok": True}
