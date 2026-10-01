@@ -5,6 +5,10 @@ import json
 import re
 import math
 import sqlite3
+import subprocess
+import tempfile
+import shutil
+import uuid
 from datetime import datetime, timezone, timedelta
 import numpy as np
 import pandas as pd
@@ -4861,6 +4865,96 @@ async def supprimer_note(note_id: int):
     conn.commit()
     conn.close()
     return {"ok": True}
+
+
+# ============================================================
+# BACKTESTING -- panneau "bac à sable" : coller un script Python déjà
+# écrit (typiquement par une IA) et un fichier de données, le lancer,
+# voir le résultat -- sans jamais avoir besoin d'ouvrir un terminal ni
+# d'installer Python soi-même. Toujours exécuté dans un sous-processus
+# à part, avec un délai limite, pour qu'un script qui boucle à l'infini
+# ou qui plante ne touche jamais au reste de XTRUNN.
+# ============================================================
+BACKTESTING_DIR = os.path.join(APPDATA_DIR, "backtesting")
+BACKTESTING_TIMEOUT_SECONDES = 60
+
+
+def _id_execution_valide(execution_id):
+    # Un UUID4 généré par nos soins -- jamais de caractères qui
+    # permettraient de sortir du dossier prévu (../, /, etc.)
+    try:
+        uuid.UUID(execution_id)
+        return True
+    except (ValueError, AttributeError):
+        return False
+
+
+@app.post("/backtesting/executer")
+async def executer_script_backtesting(script: str = Form(...), fichier_donnees: UploadFile = File(None)):
+    os.makedirs(BACKTESTING_DIR, exist_ok=True)
+    execution_id = str(uuid.uuid4())
+    dossier_exec = os.path.join(BACKTESTING_DIR, execution_id)
+    os.makedirs(dossier_exec, exist_ok=True)
+
+    nom_fichier_donnees = None
+    if fichier_donnees is not None and fichier_donnees.filename:
+        nom_fichier_donnees = os.path.basename(fichier_donnees.filename)
+        chemin_donnees = os.path.join(dossier_exec, nom_fichier_donnees)
+        with open(chemin_donnees, "wb") as f:
+            f.write(await fichier_donnees.read())
+
+    chemin_script = os.path.join(dossier_exec, "script.py")
+    with open(chemin_script, "w", encoding="utf-8") as f:
+        f.write(script)
+
+    fichiers_avant = set(os.listdir(dossier_exec))
+
+    timed_out = False
+    try:
+        resultat = subprocess.run(
+            [sys.executable, "script.py"],
+            cwd=dossier_exec,
+            capture_output=True,
+            text=True,
+            timeout=BACKTESTING_TIMEOUT_SECONDES,
+        )
+        stdout, stderr, code_retour = resultat.stdout, resultat.stderr, resultat.returncode
+    except subprocess.TimeoutExpired as e:
+        timed_out = True
+        stdout = e.stdout or ""
+        stderr = (e.stderr or "") + f"\n\n--- Arrêté après {BACKTESTING_TIMEOUT_SECONDES} secondes : le script met trop de temps (boucle infinie ?) ---"
+        code_retour = None
+
+    fichiers_apres = set(os.listdir(dossier_exec))
+    fichiers_produits = sorted(fichiers_apres - fichiers_avant - {"script.py"})
+
+    # Tronqué pour éviter qu'un script trop bavard (ex. un print dans une
+    # boucle) ne fasse exploser la taille de la réponse.
+    LIMITE_CARACTERES = 50_000
+    if len(stdout) > LIMITE_CARACTERES:
+        stdout = stdout[:LIMITE_CARACTERES] + "\n\n--- Sortie tronquée (trop longue) ---"
+    if len(stderr) > LIMITE_CARACTERES:
+        stderr = stderr[:LIMITE_CARACTERES] + "\n\n--- Erreur tronquée (trop longue) ---"
+
+    return {
+        "execution_id": execution_id,
+        "stdout": stdout,
+        "stderr": stderr,
+        "code_retour": code_retour,
+        "timed_out": timed_out,
+        "fichiers_produits": fichiers_produits,
+    }
+
+
+@app.get("/backtesting/fichier/{execution_id}/{nom_fichier}")
+async def telecharger_fichier_backtesting(execution_id: str, nom_fichier: str):
+    if not _id_execution_valide(execution_id):
+        raise HTTPException(status_code=400, detail="Identifiant d'exécution invalide.")
+    nom_fichier_sur = os.path.basename(nom_fichier)
+    chemin = os.path.join(BACKTESTING_DIR, execution_id, nom_fichier_sur)
+    if not os.path.isfile(chemin):
+        raise HTTPException(status_code=404, detail="Fichier introuvable.")
+    return FileResponse(chemin, filename=nom_fichier_sur)
 
 
 def construire_prompt_observations(resultat, comportement=None):
