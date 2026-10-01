@@ -888,6 +888,19 @@
             transition: color 0.2s ease, border-color 0.2s ease, transform 0.4s ease;
         }
         .parametres-btn:hover { color: var(--horizon); border-color: var(--ash-bright); }
+        #notesBtn:hover { color: var(--horizon); border-color: var(--ash-bright); }
+        .notes-chip-epingle { flex-shrink:0; padding:5px 12px; border-radius:14px; border:1px solid var(--ash); background:var(--void-3); color:var(--text-muted); font-size:0.72rem; cursor:pointer; white-space:nowrap; max-width:140px; overflow:hidden; text-overflow:ellipsis; transition:color 0.2s ease, border-color 0.2s ease; }
+        .notes-chip-epingle:hover { color:var(--horizon); border-color:var(--ash-bright); }
+        .notes-tb-btn { width:28px; height:28px; border-radius:6px; border:1px solid transparent; background:none; color:var(--text-muted); font-size:0.8rem; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:color 0.15s ease, background 0.15s ease, border-color 0.15s ease; }
+        .notes-tb-btn:hover { color:var(--horizon); background:rgba(255,255,255,0.05); }
+        .notes-tb-btn.actif { color:var(--horizon); border-color:var(--ash-bright); background:rgba(255,255,255,0.06); }
+        #notesContenuTextarea:empty::before { content: attr(data-placeholder); color:var(--text-muted); opacity:0.6; pointer-events:none; }
+        #notesContenuTextarea h3 { font-family:'Space Grotesk',sans-serif; font-size:1.05rem; font-weight:600; color:var(--horizon); margin:14px 0 6px; }
+        #notesContenuTextarea ul, #notesContenuTextarea ol { padding-left:22px; margin:6px 0; }
+        #notesContenuTextarea p { margin:0 0 8px; }
+        .note-check-item { display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,0.04); border:1px solid var(--ash); border-radius:6px; padding:2px 8px 2px 4px; margin:1px 0; }
+        .note-check-item input[type="checkbox"] { cursor:pointer; accent-color: var(--surbrillance, #8a8aff); }
+        .note-check-item.coche .note-check-label { text-decoration:line-through; opacity:0.5; }
 
         /* Menu déroulant ancré sous le bouton Paramètres -- jamais sur la
            barre du haut, et pas de fond sombre plein écran, pour que le
@@ -1794,6 +1807,15 @@
                 <h1>XTRUNN</h1>
                 <div class="subtitle">Moteur de Robustesse Quantitatif</div>
             </div>
+            <button id="notesBtn" onclick="ouvrirPanneauNotes()" title="Notes" style="margin-left:16px; flex-shrink:0; width:32px; height:32px; border-radius:50%; border:1px solid var(--ash); background:var(--void-3); color:var(--text-muted); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:color 0.2s ease, border-color 0.2s ease;">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+                    <path d="M14 3v6h6"></path>
+                    <line x1="8" y1="13" x2="16" y2="13"></line>
+                    <line x1="8" y1="17" x2="13" y2="17"></line>
+                </svg>
+            </button>
+            <div id="notesChipsEpingles" style="display:flex; gap:6px; margin-left:10px; overflow-x:auto; max-width:360px;"></div>
         </div>
 
         <div class="orbit-scores-groupe" id="orbitScoresGroupe" style="display:none; align-items:center; gap:22px; justify-self:center;">
@@ -1820,14 +1842,6 @@
             </div>
         </div>
 
-        <button class="parametres-btn" id="notesBtn" onclick="ouvrirPanneauNotes()" title="Notes" style="right:76px;"
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
-                <path d="M14 3v6h6"></path>
-                <line x1="8" y1="13" x2="16" y2="13"></line>
-                <line x1="8" y1="17" x2="13" y2="17"></line>
-            </svg>
-        </button>
         <button class="parametres-btn" id="parametresBtn" onclick="ouvrirParametres()" title="Paramètres"
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="3"></circle>
@@ -3616,10 +3630,10 @@
     </div>
 
     <div id="modalNotes" class="modal-overlay" style="display:none;" onclick="if(event.target===this) fermerPanneauNotes()">
-        <div class="modal-content" style="max-width:820px; width:92vw; padding:0; overflow:hidden;">
+        <div class="modal-content" style="max-width:1180px; width:94vw; padding:0; overflow:hidden;">
             <button class="modal-close" onclick="fermerPanneauNotes()" style="z-index:2;">✕</button>
-            <div id="notesEspaceTravail" style="display:flex; height:min(640px, 78vh);">
-                <div style="width:220px; flex-shrink:0; border-right:1px solid var(--ash); background:var(--void-3); display:flex; flex-direction:column;">
+            <div id="notesEspaceTravail" style="display:flex; height:min(820px, 88vh);">
+                <div style="width:260px; flex-shrink:0; border-right:1px solid var(--ash); background:var(--void-3); display:flex; flex-direction:column;">
                     <div style="padding:20px 16px 12px; font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:0.95rem;">Notes</div>
                     <div id="notesListeOnglets" style="flex:1; overflow-y:auto; padding:0 8px;"></div>
                     <button onclick="creerOngletNotes()" style="margin:10px; padding:9px; background:transparent; border:1px dashed var(--border-silver); border-radius:8px; color:var(--text-muted); font-size:0.78rem; cursor:pointer;">+ Nouvel onglet</button>
@@ -3630,7 +3644,19 @@
                         <span id="notesSauvegardeEtat" style="font-size:0.68rem; color:var(--text-muted); opacity:0.7; white-space:nowrap;"></span>
                         <button onclick="supprimerOngletNotesActuel()" title="Supprimer cet onglet" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1rem; flex-shrink:0;">🗑</button>
                     </div>
-                    <textarea id="notesContenuTextarea" oninput="sauvegarderContenuNotesDebounce()" placeholder="Écris librement ici -- rappels, méthode, idées en cours..." style="flex:1; resize:none; border:none; outline:none; background:none; color:var(--silver-bright); font-family:inherit; font-size:0.88rem; line-height:1.65; padding:20px;"></textarea>
+                    <div id="notesToolbar" style="display:flex; align-items:center; gap:4px; padding:8px 16px; border-bottom:1px solid var(--ash); flex-wrap:wrap;">
+                        <button type="button" class="notes-tb-btn" onclick="formaterNote('bold')" title="Gras"><b>G</b></button>
+                        <button type="button" class="notes-tb-btn" onclick="formaterNote('italic')" title="Italique"><i>I</i></button>
+                        <button type="button" class="notes-tb-btn" onclick="formaterNote('formatBlock', 'H3')" title="Titre">H</button>
+                        <button type="button" class="notes-tb-btn" onclick="formaterNote('formatBlock', 'P')" title="Texte normal">¶</button>
+                        <span style="width:1px; height:18px; background:var(--ash); margin:0 4px;"></span>
+                        <button type="button" class="notes-tb-btn" onclick="formaterNote('insertUnorderedList')" title="Liste à puces">•≡</button>
+                        <button type="button" class="notes-tb-btn" onclick="formaterNote('insertOrderedList')" title="Liste numérotée">1≡</button>
+                        <span style="width:1px; height:18px; background:var(--ash); margin:0 4px;"></span>
+                        <button type="button" class="notes-tb-btn" id="notesTbChecklist" onclick="toggleModeChecklistNotes()" title="Mode checklist -- sélectionne du texte pour le transformer en case à cocher">☑</button>
+                        <button type="button" class="notes-tb-btn" id="notesTbCocherSelection" onclick="cocherSelectionNotes()" title="Transformer la sélection en case à cocher" style="display:none; font-size:0.68rem; width:auto; padding:0 10px;">Cocher la sélection</button>
+                    </div>
+                    <div id="notesContenuTextarea" contenteditable="true" oninput="sauvegarderContenuNotesDebounce()" data-placeholder="Écris librement ici -- rappels, méthode, idées en cours..." style="flex:1; overflow-y:auto; outline:none; color:var(--silver-bright); font-family:inherit; font-size:0.88rem; line-height:1.65; padding:20px;"></div>
                 </div>
             </div>
             <div id="notesVide" style="display:none; padding:60px 30px; text-align:center; color:var(--text-muted); font-size:0.85rem;">
@@ -7172,6 +7198,7 @@
         // Pré-remplissage de la liste des noms de stratégies déjà connues au démarrage
         rafraichirListeNoms();
         chargerStrategies();
+        chargerPastillesEpinglesInitial();
 
         // Standard reste le choix par défaut pour qui n'a jamais rien
         // choisi -- mais un protocole change rarement d'une analyse à
@@ -8325,18 +8352,80 @@
         let noteOngletActifId = null;
         let notesDebounceRenommer = null;
         let notesDebounceContenu = null;
+        let modeChecklistNotesActif = false;
+
+        function formaterNote(commande, valeur) {
+            document.getElementById('notesContenuTextarea').focus();
+            document.execCommand(commande, false, valeur || null);
+            sauvegarderContenuNotesDebounce();
+        }
+
+        function toggleModeChecklistNotes() {
+            modeChecklistNotesActif = !modeChecklistNotesActif;
+            document.getElementById('notesTbChecklist').classList.toggle('actif', modeChecklistNotesActif);
+            document.getElementById('notesTbCocherSelection').style.display = modeChecklistNotesActif ? 'flex' : 'none';
+        }
+
+        function cocherSelectionNotes() {
+            const zone = document.getElementById('notesContenuTextarea');
+            const sel = window.getSelection();
+            if (!sel.rangeCount || sel.isCollapsed) {
+                alert("Sélectionne d'abord le texte à transformer en case à cocher.");
+                return;
+            }
+            const range = sel.getRangeAt(0);
+            if (!zone.contains(range.commonAncestorContainer)) {
+                alert("La sélection doit se trouver dans la zone de notes.");
+                return;
+            }
+            const texte = range.toString();
+            if (!texte.trim()) return;
+
+            const item = document.createElement('span');
+            item.className = 'note-check-item';
+            item.setAttribute('contenteditable', 'false');
+            item.innerHTML = `<input type="checkbox" onchange="toggleNoteCheckbox(this)"><span class="note-check-label">${echapperHtmlNotes(texte)}</span>`;
+            range.deleteContents();
+            range.insertNode(item);
+            item.after(document.createTextNode('\u00A0'));
+            sel.removeAllRanges();
+            sauvegarderContenuNotesDebounce();
+        }
+
+        function toggleNoteCheckbox(checkbox) {
+            checkbox.closest('.note-check-item').classList.toggle('coche', checkbox.checked);
+            sauvegarderContenuNotesDebounce();
+        }
 
         function echapperHtmlNotes(texte) {
             return String(texte === null || texte === undefined ? '' : texte)
                 .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
 
-        async function ouvrirPanneauNotes() {
+        async function chargerPastillesEpinglesInitial() {
+            try {
+                const resp = await fetch('http://127.0.0.1:8000/notes');
+                const data = await resp.json();
+                notesOnglets = data.onglets || [];
+                renderChipsEpinglesHeader();
+            } catch (err) { /* silencieux -- l'en-tete reste simplement sans pastilles */ }
+        }
+
+        function renderChipsEpinglesHeader() {
+            const conteneur = document.getElementById('notesChipsEpingles');
+            const epingles = notesOnglets.filter(o => o.epingle);
+            conteneur.innerHTML = epingles.map(o => `
+                <button class="notes-chip-epingle" onclick="ouvrirPanneauNotes(${o.id})" title="${echapperHtmlNotes(o.nom)}">${echapperHtmlNotes(o.nom)}</button>
+            `).join('');
+        }
+
+        async function ouvrirPanneauNotes(ongletCibleId) {
             ouvrirModaleAnimee('modalNotes');
             try {
                 const resp = await fetch('http://127.0.0.1:8000/notes');
                 const data = await resp.json();
                 notesOnglets = data.onglets || [];
+                renderChipsEpinglesHeader();
                 if (notesOnglets.length === 0) {
                     noteOngletActifId = null;
                     renderListeOngletsNotes();
@@ -8347,7 +8436,8 @@
                 document.getElementById('notesVide').style.display = 'none';
                 document.getElementById('notesEspaceTravail').style.display = 'flex';
                 const dernierActifId = parseInt(localStorage.getItem('xtrunn_dernier_onglet_notes') || '', 10);
-                const cible = notesOnglets.find(o => o.id === dernierActifId) || notesOnglets[0];
+                const cible = (ongletCibleId !== undefined && notesOnglets.find(o => o.id === ongletCibleId))
+                    || notesOnglets.find(o => o.id === dernierActifId) || notesOnglets[0];
                 selectionnerOngletNotes(cible.id);
             } catch (err) {
                 alert("Impossible de charger les notes.");
@@ -8361,10 +8451,25 @@
         function renderListeOngletsNotes() {
             const liste = document.getElementById('notesListeOnglets');
             liste.innerHTML = notesOnglets.map(o => `
-                <div onclick="selectionnerOngletNotes(${o.id})" style="padding:10px 10px; margin:2px 0; border-radius:7px; cursor:pointer; font-size:0.82rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; ${o.id === noteOngletActifId ? 'background:rgba(255,255,255,0.06); color:var(--horizon);' : 'color:var(--text-muted);'}">
-                    ${echapperHtmlNotes(o.nom)}
+                <div onclick="selectionnerOngletNotes(${o.id})" style="padding:10px 10px; margin:2px 0; border-radius:7px; cursor:pointer; font-size:0.82rem; display:flex; align-items:center; gap:6px; ${o.id === noteOngletActifId ? 'background:rgba(255,255,255,0.06); color:var(--horizon);' : 'color:var(--text-muted);'}">
+                    <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${echapperHtmlNotes(o.nom)}</span>
+                    <span onclick="event.stopPropagation(); toggleEpingleOnglet(${o.id})" title="${o.epingle ? 'Désépingler' : 'Épingler dans l\u2019en-tête'}" style="flex-shrink:0; opacity:${o.epingle ? '1' : '0.35'}; font-size:0.78rem;">📌</span>
                 </div>
             `).join('');
+        }
+
+        async function toggleEpingleOnglet(id) {
+            const onglet = notesOnglets.find(o => o.id === id);
+            if (!onglet) return;
+            onglet.epingle = !onglet.epingle;
+            renderListeOngletsNotes();
+            renderChipsEpinglesHeader();
+            try {
+                await fetch('http://127.0.0.1:8000/notes/' + id, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ epingle: onglet.epingle })
+                });
+            } catch (err) { /* l'etat visuel reste correct meme si la sauvegarde echoue ponctuellement */ }
         }
 
         function selectionnerOngletNotes(id) {
@@ -8373,7 +8478,10 @@
             const onglet = notesOnglets.find(o => o.id === id);
             if (!onglet) return;
             document.getElementById('notesNomOngletInput').value = onglet.nom;
-            document.getElementById('notesContenuTextarea').value = onglet.contenu;
+            document.getElementById('notesContenuTextarea').innerHTML = onglet.contenu;
+            document.getElementById('notesTbChecklist').classList.remove('actif');
+            document.getElementById('notesTbCocherSelection').style.display = 'none';
+            modeChecklistNotesActif = false;
             document.getElementById('notesSauvegardeEtat').textContent = '';
             renderListeOngletsNotes();
         }
@@ -8401,6 +8509,7 @@
             try {
                 await fetch('http://127.0.0.1:8000/notes/' + noteOngletActifId, { method: 'DELETE' });
                 notesOnglets = notesOnglets.filter(o => o.id !== noteOngletActifId);
+                renderChipsEpinglesHeader();
                 if (notesOnglets.length === 0) {
                     noteOngletActifId = null;
                     renderListeOngletsNotes();
@@ -8427,6 +8536,7 @@
                     const onglet = notesOnglets.find(o => o.id === noteOngletActifId);
                     if (onglet) onglet.nom = nouveauNom.trim() || onglet.nom;
                     renderListeOngletsNotes();
+                    renderChipsEpinglesHeader();
                 } catch (err) { /* silencieux -- pas de coupure du flux d'écriture pour une erreur reseau ponctuelle */ }
             }, 500);
         }
@@ -8435,7 +8545,7 @@
             clearTimeout(notesDebounceContenu);
             const etat = document.getElementById('notesSauvegardeEtat');
             etat.textContent = '...';
-            const contenu = document.getElementById('notesContenuTextarea').value;
+            const contenu = document.getElementById('notesContenuTextarea').innerHTML;
             notesDebounceContenu = setTimeout(async () => {
                 if (noteOngletActifId === null) return;
                 try {
