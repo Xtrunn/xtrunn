@@ -888,6 +888,20 @@
             transition: color 0.2s ease, border-color 0.2s ease, transform 0.4s ease;
         }
         .parametres-btn:hover { color: var(--horizon); border-color: var(--ash-bright); }
+        #notesBtn:hover { color: var(--horizon); border-color: var(--ash-bright); }
+        #backtestingBtn:hover { color: var(--horizon); border-color: var(--ash-bright); }
+        .notes-chip-epingle { flex-shrink:0; padding:5px 12px; border-radius:14px; border:1px solid var(--ash); background:var(--void-3); color:var(--text-muted); font-size:0.72rem; cursor:pointer; white-space:nowrap; max-width:140px; overflow:hidden; text-overflow:ellipsis; transition:color 0.2s ease, border-color 0.2s ease; }
+        .notes-chip-epingle:hover { color:var(--horizon); border-color:var(--ash-bright); }
+        .notes-tb-btn { width:28px; height:28px; border-radius:6px; border:1px solid transparent; background:none; color:var(--text-muted); font-size:0.8rem; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:color 0.15s ease, background 0.15s ease, border-color 0.15s ease; }
+        .notes-tb-btn:hover { color:var(--horizon); background:rgba(255,255,255,0.05); }
+        .notes-tb-btn.actif { color:var(--horizon); border-color:var(--ash-bright); background:rgba(255,255,255,0.06); }
+        #notesContenuTextarea:empty::before { content: attr(data-placeholder); color:var(--text-muted); opacity:0.6; pointer-events:none; }
+        #notesContenuTextarea h3 { font-family:'Space Grotesk',sans-serif; font-size:1.05rem; font-weight:600; color:var(--horizon); margin:14px 0 6px; }
+        #notesContenuTextarea ul, #notesContenuTextarea ol { padding-left:22px; margin:6px 0; }
+        #notesContenuTextarea p { margin:0 0 8px; }
+        .note-check-item { display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,0.04); border:1px solid var(--ash); border-radius:6px; padding:2px 8px 2px 4px; margin:1px 0; }
+        .note-check-item input[type="checkbox"] { cursor:pointer; accent-color: var(--surbrillance, #8a8aff); }
+        .note-check-item.coche .note-check-label { text-decoration:line-through; opacity:0.5; }
 
         /* Menu déroulant ancré sous le bouton Paramètres -- jamais sur la
            barre du haut, et pas de fond sombre plein écran, pour que le
@@ -975,9 +989,6 @@
             transition: width 0.22s ease;
         }
         .sub-nav.collapsed { width: 72px; }
-        #epreuveRailNav {
-            background: linear-gradient(180deg, rgba(var(--rail-validation-teinte-rgb, 0,0,0), var(--rail-validation-teinte-alpha, 0)), rgba(var(--rail-validation-teinte-rgb, 0,0,0), calc(var(--rail-validation-teinte-alpha, 0) * 0.5))), linear-gradient(180deg, var(--void-2), var(--void));
-        }
 
         /* Bouton plier/déplier -- à cheval sur la bordure du rail, donc
            toujours au même endroit relativement au bord actuel, que le
@@ -1349,6 +1360,8 @@
 
         .module-section { display: none; animation: deriveIn 0.4s cubic-bezier(.2,.7,.3,1); }
         .module-section.active { display: block; }
+        body.type-suivi #epreuveRailNav .sub-tab,
+        body.type-suivi #epreuveRailNav .rail-section { display: none; }
         @keyframes deriveIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
@@ -1795,6 +1808,21 @@
                 <h1>XTRUNN</h1>
                 <div class="subtitle">Moteur de Robustesse Quantitatif</div>
             </div>
+            <button id="notesBtn" onclick="ouvrirPanneauNotes()" title="Notes" style="margin-left:16px; flex-shrink:0; width:32px; height:32px; border-radius:50%; border:1px solid var(--ash); background:var(--void-3); color:var(--text-muted); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:color 0.2s ease, border-color 0.2s ease;">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+                    <path d="M14 3v6h6"></path>
+                    <line x1="8" y1="13" x2="16" y2="13"></line>
+                    <line x1="8" y1="17" x2="13" y2="17"></line>
+                </svg>
+            </button>
+            <div id="notesChipsEpingles" style="display:flex; gap:6px; margin-left:10px; overflow-x:auto; max-width:360px;"></div>
+            <button id="backtestingBtn" onclick="ouvrirPanneauBacktesting()" title="Backtesting" style="margin-left:10px; flex-shrink:0; width:32px; height:32px; border-radius:50%; border:1px solid var(--ash); background:var(--void-3); color:var(--text-muted); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:color 0.2s ease, border-color 0.2s ease;">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="4 17 10 11 4 5"></polyline>
+                    <line x1="12" y1="19" x2="20" y2="19"></line>
+                </svg>
+            </button>
         </div>
 
         <div class="orbit-scores-groupe" id="orbitScoresGroupe" style="display:none; align-items:center; gap:22px; justify-self:center;">
@@ -1832,7 +1860,7 @@
     <div id="env-algo">
     <div class="mode-switcher-classique" id="modeSwitcherClassique" style="display:none;">
         <button type="button" class="mode-switcher-classique-btn active" data-mode="analyse" onclick="basculerModeAccueil('analyse')">Analyse</button>
-        <button type="button" class="mode-switcher-classique-btn" data-mode="validation_officielle" onclick="basculerModeAccueil('validation_officielle')">Validation</button>
+        <button type="button" class="mode-switcher-classique-btn" data-mode="validation_officielle" onclick="basculerModeAccueil('validation_officielle')">Suivi</button>
     </div>
 
     <div class="mode-switcher" id="modeSwitcher">
@@ -1843,9 +1871,9 @@
             <span>◎</span>
             <span class="mode-node-label active-label">Analyse</span>
         </div>
-        <div class="mode-node-target" id="modeNodeValidationOfficielle" style="left:53.10px; top:299.30px;" onclick="basculerModeAccueil('validation_officielle')" title="Validation Officielle">
+        <div class="mode-node-target" id="modeNodeValidationOfficielle" style="left:53.10px; top:299.30px;" onclick="basculerModeAccueil('validation_officielle')" title="Suivi">
             <span class="mode-node-icon mode-icon-validation"><svg viewBox="3.3 1.23 18.62 26.15" width="20" height="28" fill="currentColor"><path d="M12.33 2.73L10.73 3.76L8.56 3.76L7.72 5.46L7.25 5.84L6.21 6.21L5.84 6.59L5.84 8.66L4.8 10.26L4.8 10.73L5.84 12.33L5.74 14.21L5.93 14.59L7.62 15.44L8.56 17.22L8.94 17.41L10.64 17.22L11.11 17.41L12.24 18.26L12.99 18.26L14.12 17.41L14.59 17.22L16.38 17.41L16.85 17.04L17.22 16.0L17.79 15.34L19.39 14.49L19.39 12.42L19.67 11.76L20.42 10.82L20.42 10.16L19.67 9.22L19.39 8.56L19.39 6.49L17.69 5.65L17.22 4.99L16.66 3.76L14.49 3.76L14.31 3.58L14.02 3.58L12.89 2.73Z"/><path d="M7.81 17.22L5.46 24.19L8.09 22.96L8.66 22.87L9.13 23.25L10.54 25.88L12.89 19.01L12.33 19.01L10.82 17.98L8.56 17.98Z"/><path d="M17.51 17.32L17.32 17.32L16.66 17.98L14.4 17.98L13.65 18.64L12.99 20.61L12.99 20.99L14.68 25.88L16.38 22.96L16.94 22.87L19.76 24.19Z"/><path d="M16.19 8.85L15.53 8.19L15.34 8.19L11.67 11.86L11.39 11.86L9.88 10.35L9.69 10.35L9.13 11.11L11.58 13.55Z" fill="#00000070"/></svg></span>
-            <span class="mode-node-label">Validation</span>
+            <span class="mode-node-label">Suivi</span>
         </div>
         <div class="mode-node-handle" id="modeNodeHandle" style="left:53.10px; top:140.70px;" onpointerdown="demarrerDragOrbite(event)"></div>
     </div>
@@ -1979,8 +2007,8 @@
         <div id="modeValidationOfficielleContent" class="mode-content" style="display:none;">
             <div id="voListeContainer">
                 <div class="mode-hero">
-                    <h2>Validation Officielle</h2>
-                    <p>Le vrai test complet du logiciel — une stratégie déjà analysée et jugée robuste, confrontée à l'exécution réelle, avec un verdict qui ne laisse aucune ambiguïté.</p>
+                    <h2>Suivi</h2>
+                    <p>Suivez une stratégie en conditions réelles, avec des règles fixées à l'avance : XTRUNN vous dit quand elle reste saine, quand la surveiller de plus près, et quand la couper.</p>
                 </div>
 
                 <div class="panel" style="text-align:center; padding:36px 30px;">
@@ -1989,14 +2017,15 @@
                         <div class="vo-demo-cible"></div>
                     </div>
                     <p style="font-size:0.85rem; color:var(--horizon); max-width:440px; margin:22px auto 0; line-height:1.6;">
-                        Pour démarrer une Validation Officielle, glissez une carte de stratégie depuis le mode Analyse jusqu'à ce nœud, dans le sélecteur à gauche — seules celles ayant déjà un score assez robuste peuvent être déposées ici.
+                        Pour suivre une stratégie déjà analysée, glissez sa carte depuis le mode Analyse jusqu'à ce nœud, dans le sélecteur à gauche. Aucun score minimum n'est exigé : une stratégie fragile a encore plus besoin d'être suivie de près.
                     </p>
+                    <button class="btn-analyser" style="margin-top:22px; background:transparent; color:var(--silver-bright); border:1px solid var(--border-silver);" onclick="ouvrirModalConfigurerSuivi(null)">Créer un suivi vierge</button>
                 </div>
 
-                <div class="panel-title" style="margin-bottom:14px; margin-top:36px;">Vos Validations</div>
+                <div class="panel-title" style="margin-bottom:14px; margin-top:36px;">Vos Suivis</div>
                 <div class="panel">
                     <div id="voSansCandidat" style="display:none; color:var(--text-muted); font-size:0.8rem;">
-                        Aucune Validation Officielle en cours pour le moment.
+                        Aucun suivi pour le moment.
                     </div>
                     <div id="voListe"></div>
                 </div>
@@ -2291,7 +2320,7 @@
                         <div class="pillar-header-badge">P2</div>
                         <div class="pillar-header-info">
                             <div class="pillar-header-title">Sensibilité de Trajectoire <span class="pillar-header-score" id="p1ScoreDisplay">-- / 25</span></div>
-                            <p class="pillar-header-desc">Réordonner des trades ne change jamais leur somme — seul le chemin parcouru (et donc le drawdown) varie. Ce pilier note uniquement si le drawdown réel a eu de la "chance" dans son enchaînement. Le facteur de récupération (le profit justifie-t-il l'ampleur du risque) est noté séparément, dans le diagnostic Risque.</p>
+                            <p class="pillar-header-desc">Réordonner des trades ne change jamais leur somme — seul le chemin parcouru (et donc le drawdown) varie. Ce pilier note uniquement si le drawdown réel a eu de la "chance" dans son enchînement. Le facteur de récupération (le profit justifie-t-il l'ampleur du risque) est noté séparément, dans le diagnostic Risque.</p>
                             <div class="pillar-header-metrics">
                                 <div><span>Score Sensibilité</span><b id="p1ScorePath">-- / 25</b></div>
                             </div>
@@ -3113,8 +3142,168 @@
                     </div>
                 </div>
             </div>
+
+            <div id="mod-suivi" class="module-section">
+                <div class="panel">
+                    <div class="panel-title">Statut Actuel</div>
+                    <div style="text-align:center; padding:10px 0 4px;">
+                        <div id="suiviStatutGrand" style="font-family:'Space Grotesk',sans-serif; font-size:2.4rem; font-weight:700; letter-spacing:1px;">--</div>
+                        <div id="suiviStatutMessage" style="font-size:0.84rem; color:var(--text-muted); margin-top:8px; line-height:1.5; max-width:560px; margin-left:auto; margin-right:auto;"></div>
+                    </div>
+                    <div id="suiviBandeauDonnees" style="display:none; margin-top:14px; padding:10px 14px; background:rgba(255,255,255,0.03); border:1px dashed var(--ash-bright); border-radius:8px; font-size:0.78rem; color:var(--text-muted); line-height:1.5;"></div>
+                    <div id="suiviRaisons" style="margin-top:14px;"></div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-title">Drawdown Max Atteint vs Vos Seuils <span class="info-tip" data-tip="Le pire creux traversé depuis le début du suivi, en % du plus haut atteint. Le trait ambre est votre seuil d'alerte interne, le trait rouge la limite dure : la franchir coupe la stratégie sans condition.">?</span></div>
+                    <div id="suiviJauge"></div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-title">Chiffres Clés</div>
+                    <div class="metric-row-4">
+                        <div class="mc-info-card"><div class="mc-info-title">Profit Net</div><div class="mc-info-val" id="suiviKpiProfit">--</div></div>
+                        <div class="mc-info-card"><div class="mc-info-title">Drawdown Max Atteint</div><div class="mc-info-val" id="suiviKpiDrawdown">--</div></div>
+                        <div class="mc-info-card"><div class="mc-info-title">Pire Journée</div><div class="mc-info-val" id="suiviKpiPireJour">--</div></div>
+                        <div class="mc-info-card"><div class="mc-info-title">Trades / Jours</div><div class="mc-info-val" id="suiviKpiTrades">--</div></div>
+                    </div>
+                    <div id="suiviFenetreBloc" style="display:none;">
+                        <div class="panel-title" style="font-size:0.72rem; margin-top:6px;">Tendance Récente <span class="info-tip" data-tip="Calculée uniquement sur les derniers trades (la fenêtre glissante fixée au lancement), séparément de l'historique complet -- une stratégie peut rester positive au total tout en se dégradant nettement depuis peu.">?</span></div>
+                        <div class="metric-row-4" style="grid-template-columns: repeat(3, 1fr);">
+                            <div class="mc-info-card"><div class="mc-info-title" id="suiviFenetreTitre">Derniers trades</div><div class="mc-info-val" id="suiviFenetreN">--</div></div>
+                            <div class="mc-info-card"><div class="mc-info-title">Profit Factor Récent</div><div class="mc-info-val" id="suiviFenetrePf">--</div></div>
+                            <div class="mc-info-card"><div class="mc-info-title">Taux de Gain Récent</div><div class="mc-info-val" id="suiviFenetreWr">--</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-title">Courbe de Capital</div>
+                    <div id="suiviCourbe"></div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-title">Ajouter des Trades</div>
+                    <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
+                        <div class="input-group" style="flex:1; min-width:130px; margin-bottom:0;">
+                            <label>Date</label>
+                            <input type="date" id="suiviTradeDate">
+                        </div>
+                        <div class="input-group" style="flex:1; min-width:110px; margin-bottom:0;">
+                            <label>Profit / Perte</label>
+                            <input type="number" id="suiviTradeProfit" placeholder="ex. -42.5" step="0.01">
+                        </div>
+                        <div class="input-group" style="flex:1; min-width:110px; margin-bottom:0;">
+                            <label>Symbole <span style="text-transform:none; letter-spacing:0; opacity:0.7;">(optionnel)</span></label>
+                            <input type="text" id="suiviTradeSymbole" placeholder="EURUSD">
+                        </div>
+                        <button class="btn-analyser" style="flex:0 0 auto; padding:12px 22px;" onclick="ajouterTradeSuivi()">Ajouter</button>
+                    </div>
+                    <div class="input-group" style="margin-top:12px; margin-bottom:0;">
+                        <label>Notes <span style="text-transform:none; letter-spacing:0; opacity:0.7;">(optionnel)</span></label>
+                        <input type="text" id="suiviTradeNotes" placeholder="ex. sorti avant le stop, news en cours...">
+                    </div>
+
+                    <div style="border-top:1px solid var(--ash); margin-top:20px; padding-top:18px;">
+                        <div style="font-size:0.74rem; color:var(--text-muted); margin-bottom:10px; line-height:1.5;">Ou importer un export de votre plateforme. Vous pouvez réimporter l'historique complet à chaque fois : les trades déjà enregistrés sont reconnus et ignorés, jamais dupliqués.</div>
+                        <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
+                            <div class="input-group" style="flex:2; min-width:200px; margin-bottom:0;">
+                                <label>Fichier</label>
+                                <input type="file" id="suiviImportFile" accept=".csv, .xlsx, .xls, .htm, .html">
+                            </div>
+                            <div class="input-group" style="flex:1; min-width:140px; margin-bottom:0;">
+                                <label>Plateforme</label>
+                                <select id="suiviImportPlateforme">
+                                    <option value="mt5">MetaTrader 5</option>
+                                    <option value="mt4">MetaTrader 4</option>
+                                    <option value="ctrader">cTrader</option>
+                                    <option value="tradingview">TradingView</option>
+                                </select>
+                            </div>
+                            <button class="btn-analyser" style="flex:0 0 auto; padding:12px 22px; background:transparent; color:var(--silver-bright); border:1px solid var(--border-silver);" onclick="importerTradesSuivi()">Importer</button>
+                        </div>
+                        <div id="suiviImportMsg" style="display:none; margin-top:12px; font-size:0.78rem;"></div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-title">Historique des Trades <span id="suiviNbTradesListe" style="font-weight:400; opacity:0.6;"></span></div>
+                    <div id="suiviListeTrades" style="max-height:420px; overflow-y:auto;"></div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-title">Seuils Fixés au Lancement</div>
+                    <div id="suiviResumeSeuils" style="font-size:0.8rem; line-height:1.9; color:var(--text-muted);"></div>
+                    <button class="btn-analyser" style="margin-top:16px; background:transparent; color:var(--danger); border:1px solid rgba(201,106,99,0.4);" onclick="supprimerEpreuveActuelleEcran()">Supprimer ce suivi</button>
+                </div>
+            </div>
         </div>
     </div>
+
+    <div id="backtestingScreen" style="display:none; max-width:1200px; margin:0 auto; padding:30px 24px 60px;">
+        <div class="panel">
+            <div class="panel-title">Backtesting</div>
+            <p style="font-size:0.8rem; color:var(--text-muted); line-height:1.6; margin-bottom:16px;">
+                Dépose un fichier de données, colle un script Python (écrit par ton IA par exemple), lance-le.
+                Si le script produit un fichier <strong>trades.csv</strong> (colonnes <strong>date, profit</strong>),
+                XTRUNN calcule lui-même toutes les statistiques ci-dessous -- le script n'a qu'à produire la liste des trades,
+                jamais à recalculer un Profit Factor ou un drawdown lui-même.
+            </p>
+            <div style="display:flex; gap:14px; align-items:flex-end; flex-wrap:wrap; margin-bottom:14px;">
+                <div class="input-group" style="flex:1; min-width:200px; margin-bottom:0;">
+                    <label>Fichier de données <span style="text-transform:none; letter-spacing:0; opacity:0.7;">(optionnel)</span></label>
+                    <input type="file" id="btFichierDonnees">
+                </div>
+                <div class="input-group" style="flex:0 0 150px; margin-bottom:0;">
+                    <label>Capital initial</label>
+                    <input type="number" id="btCapitalInitial" value="10000">
+                </div>
+                <button class="btn-analyser" style="flex:0 0 auto; padding:12px 26px;" id="btBoutonLancer" onclick="lancerScriptBacktesting()">Lancer</button>
+            </div>
+            <textarea id="btScriptTextarea" placeholder="Colle ici le script Python que ton IA t'a écrit...
+
+Le fichier déposé ci-dessus est accessible depuis le script par son nom de fichier (ex. pd.read_csv('mon_fichier.csv')).
+Pour obtenir le tableau de statistiques complet, le script doit produire un fichier trades.csv avec les colonnes date et profit.
+Tout autre fichier produit (ex. df.to_csv('autre.csv')) sera aussi proposé au téléchargement." style="width:100%; height:200px; resize:vertical; box-sizing:border-box; border:1px solid var(--ash); border-radius:8px; outline:none; background:var(--void-3); color:var(--silver-bright); font-family:'Consolas','Monaco',monospace; font-size:0.8rem; line-height:1.6; padding:14px;"></textarea>
+            <div id="btEtatExecution" style="margin-top:10px; font-size:0.82rem;"></div>
+        </div>
+
+        <div id="btZoneSortieSimple" class="panel" style="display:none;">
+            <div class="panel-title">Sortie du Script</div>
+            <div id="btContenuSortieSimple" style="font-family:'Consolas','Monaco',monospace; font-size:0.78rem; line-height:1.7; white-space:pre-wrap;"></div>
+        </div>
+
+        <div id="btZoneFichiers" style="display:none; margin-bottom:20px;"></div>
+
+        <div id="btDashboard" style="display:none;">
+            <div class="panel">
+                <div class="panel-title">Statistiques des Trades</div>
+                <div class="metric-row-4">
+                    <div class="mc-info-card"><div class="mc-info-title">Profit Net</div><div class="mc-info-val" id="btKpiProfitNet">--</div></div>
+                    <div class="mc-info-card"><div class="mc-info-title">Profit Factor</div><div class="mc-info-val" id="btKpiPF">--</div></div>
+                    <div class="mc-info-card"><div class="mc-info-title">Taux de Gain</div><div class="mc-info-val" id="btKpiTauxGain">--</div></div>
+                    <div class="mc-info-card"><div class="mc-info-title">Max Drawdown</div><div class="mc-info-val" id="btKpiDD">--</div></div>
+                </div>
+                <div class="metric-row-4" style="margin-top:10px;">
+                    <div class="mc-info-card"><div class="mc-info-title">Total Trades</div><div class="mc-info-val" id="btKpiNTrades">--</div></div>
+                    <div class="mc-info-card"><div class="mc-info-title">Trade Moyen</div><div class="mc-info-val" id="btKpiTradeMoyen">--</div></div>
+                    <div class="mc-info-card"><div class="mc-info-title">Plus Grand Gagnant</div><div class="mc-info-val" id="btKpiPlusGrandGagnant">--</div></div>
+                    <div class="mc-info-card"><div class="mc-info-title">Plus Grand Perdant</div><div class="mc-info-val" id="btKpiPlusGrandPerdant">--</div></div>
+                </div>
+                <div class="metric-row-4" style="margin-top:10px;">
+                    <div class="mc-info-card"><div class="mc-info-title">Trades Gagnants</div><div class="mc-info-val" id="btKpiGagnants">--</div></div>
+                    <div class="mc-info-card"><div class="mc-info-title">Trades Perdants</div><div class="mc-info-val" id="btKpiPerdants">--</div></div>
+                    <div class="mc-info-card"><div class="mc-info-title">Max Gains Consécutifs</div><div class="mc-info-val" id="btKpiMaxGagnantsConsec">--</div></div>
+                    <div class="mc-info-card"><div class="mc-info-title">Max Pertes Consécutives</div><div class="mc-info-val" id="btKpiMaxPerdantsConsec">--</div></div>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-title">Courbe de Capital</div>
+                <div id="btCourbe"></div>
+            </div>
+        </div>
+    </div>
+
     </div>
     </div>
 
@@ -3131,10 +3320,6 @@
         <div class="parametres-drawer-body">
 
             <div id="parametresVueListe">
-                <button type="button" class="parametres-categorie-item" onclick="ouvrirCategorieParametres('selecteur')">
-                    <span>Sélecteur de mode</span>
-                    <span class="parametres-categorie-chevron">›</span>
-                </button>
                 <button type="button" class="parametres-categorie-item" onclick="ouvrirCategorieParametres('theme')">
                     <span>Thème &amp; Couleurs</span>
                     <span class="parametres-categorie-chevron">›</span>
@@ -3192,22 +3377,6 @@
                         Une teinte appliquée au rail à gauche. Par défaut : neutre, sans teinte.
                     </p>
                     <div id="paramsNuancesRail" style="display:flex; flex-wrap:wrap; gap:10px;"></div>
-                </div>
-
-                <div style="font-size:0.68rem; letter-spacing:1.5px; text-transform:uppercase; color:var(--text-muted); margin:24px 0 10px; padding-top:16px; border-top:1px solid var(--ash);">Mode Validation</div>
-                <div class="panel" style="margin-bottom:16px;">
-                    <div class="panel-title">Couleur du Trou Noir</div>
-                    <p style="font-size:0.76rem; color:var(--text-muted); margin:8px 0 14px; line-height:1.5;">
-                        La variante « embrasée » du trou noir, visible pendant le suivi d'une épreuve.
-                    </p>
-                    <div id="paramsNuancesTrouNoirValidation" style="display:flex; flex-wrap:wrap; gap:10px;"></div>
-                </div>
-                <div class="panel">
-                    <div class="panel-title">Couleur du Rail de Navigation</div>
-                    <p style="font-size:0.76rem; color:var(--text-muted); margin:8px 0 14px; line-height:1.5;">
-                        Une teinte appliquée au rail pendant le suivi d'une épreuve, indépendante de celle du mode Analyse.
-                    </p>
-                    <div id="paramsNuancesRailValidation" style="display:flex; flex-wrap:wrap; gap:10px;"></div>
                 </div>
             </div>
 
@@ -3468,7 +3637,107 @@
         </div>
     </div>
 
-    <script>
+    <div id="modalConfigurerSuivi" class="modal-overlay" style="display:none;" onclick="if(event.target===this) fermerModalConfigurerSuivi()">
+        <div class="modal-content">
+            <button class="modal-close" onclick="fermerModalConfigurerSuivi()">✕</button>
+            <div class="modal-title">Configurer un Suivi</div>
+            <p class="modal-subtitle" id="modalSuiviSubtitle">Fixez les seuils à respecter avant de commencer -- ils ne changeront plus après, pour éviter de les ajuster après coup selon comment ça se passe.</p>
+
+            <div class="input-group">
+                <label>Nom</label>
+                <input type="text" id="modalSuiviNom" placeholder="ex. FTMO 10k -- Stratégie A">
+            </div>
+            <div style="display:flex; gap:15px;">
+                <div class="input-group" style="flex:1;">
+                    <label>Capital de Départ</label>
+                    <input type="number" id="modalSuiviCapital" placeholder="10000">
+                </div>
+                <div class="input-group" style="flex:1;">
+                    <label>Contexte <span class="info-tip" data-tip="Libre -- le nom de la prop firm si applicable (ex. FTMO), ou &quot;Compte personnel&quot;. Sert juste à t'y retrouver si tu suis plusieurs stratégies avec des règles différentes en même temps.">?</span></label>
+                    <input type="text" id="modalSuiviContexte" placeholder="ex. FTMO, ou Personnel">
+                </div>
+            </div>
+
+            <div class="panel-title" style="font-size:0.72rem; margin-top:18px;">Contraintes Dures <span class="info-tip" data-tip="Des murs absolus, jamais négociables -- si une plateforme externe (prop firm, courtier) te les impose. Laisse vide si aucune ne s'applique.">?</span></div>
+            <div style="display:flex; gap:15px;">
+                <div class="input-group" style="flex:1;">
+                    <label>Drawdown Max (%)</label>
+                    <input type="number" id="modalSuiviDrawdownMax" placeholder="ex. 10" step="0.5">
+                </div>
+                <div class="input-group" style="flex:1;">
+                    <label>Perte Journalière Max (%)</label>
+                    <input type="number" id="modalSuiviPerteJourMax" placeholder="ex. 5" step="0.5">
+                </div>
+                <div class="input-group" style="flex:1;">
+                    <label>Objectif de Profit (%) <span style="text-transform:none; letter-spacing:0; opacity:0.7;">(optionnel)</span></label>
+                    <input type="number" id="modalSuiviObjectifProfit" placeholder="ex. 10" step="0.5">
+                </div>
+            </div>
+
+            <div class="panel-title" style="font-size:0.72rem; margin-top:18px;">Votre Seuil de Sécurité <span class="info-tip" data-tip="Plus serré que le mur ci-dessus, pour avoir de la marge de réaction avant de le toucher. Suggéré automatiquement à partir du pire Max Drawdown déjà simulé par Monte Carlo si ce suivi est lié à une analyse -- reste modifiable.">?</span></div>
+            <div class="input-group">
+                <label>Seuil d'Alerte Interne -- Drawdown (%)</label>
+                <input type="number" id="modalSuiviSeuilAlerte" placeholder="ex. 6" step="0.5">
+            </div>
+
+            <div class="panel-title" style="font-size:0.72rem; margin-top:18px;">Avant de Pouvoir Juger <span class="info-tip" data-tip="En dessous de ces minimums, le statut reste &quot;Sain&quot; par défaut plutôt que d'inventer un jugement sur un échantillon trop petit pour être autre chose que du bruit.">?</span></div>
+            <div style="display:flex; gap:15px;">
+                <div class="input-group" style="flex:1;">
+                    <label>Nombre de Trades Minimum</label>
+                    <input type="number" id="modalSuiviNbTradesMin" placeholder="ex. 20" step="1">
+                </div>
+                <div class="input-group" style="flex:1;">
+                    <label>Jours Minimum <span style="text-transform:none; letter-spacing:0; opacity:0.7;">(optionnel)</span></label>
+                    <input type="number" id="modalSuiviDureeMin" placeholder="ex. 10" step="1">
+                </div>
+                <div class="input-group" style="flex:1;">
+                    <label>Fenêtre Glissante <span class="info-tip" data-tip="Nombre de trades les plus récents utilisés pour juger la tendance actuelle, séparément de l'historique complet.">?</span></label>
+                    <input type="number" id="modalSuiviFenetreGlissante" placeholder="ex. 15" step="1">
+                </div>
+            </div>
+
+            <div id="modalSuiviError" class="error-msg" style="display:none; margin-top:14px;"></div>
+            <button class="btn-analyser" style="width:100%; margin-top:18px;" id="modalSuiviBtn" onclick="lancerCreationSuivi()">Démarrer le Suivi</button>
+        </div>
+    </div>
+
+    <div id="modalNotes" class="modal-overlay" style="display:none;" onclick="if(event.target===this) fermerPanneauNotes()">
+        <div class="modal-content" style="max-width:1180px; width:94vw; padding:0; overflow:hidden;">
+            <button class="modal-close" onclick="fermerPanneauNotes()" style="z-index:2;">✕</button>
+            <div id="notesEspaceTravail" style="display:flex; height:min(820px, 88vh);">
+                <div style="width:260px; flex-shrink:0; border-right:1px solid var(--ash); background:var(--void-3); display:flex; flex-direction:column;">
+                    <div style="padding:20px 16px 12px; font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:0.95rem;">Notes</div>
+                    <div id="notesListeOnglets" style="flex:1; overflow-y:auto; padding:0 8px;"></div>
+                    <button onclick="creerOngletNotes()" style="margin:10px; padding:9px; background:transparent; border:1px dashed var(--border-silver); border-radius:8px; color:var(--text-muted); font-size:0.78rem; cursor:pointer;">+ Nouvel onglet</button>
+                </div>
+                <div style="flex:1; display:flex; flex-direction:column; min-width:0;">
+                    <div style="padding:16px 52px 16px 20px; border-bottom:1px solid var(--ash); display:flex; align-items:center; gap:10px;">
+                        <input type="text" id="notesNomOngletInput" placeholder="Nom de l'onglet" oninput="renommerOngletNotesDebounce()" style="flex:1; background:none; border:none; font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:1rem; color:var(--horizon); outline:none;">
+                        <span id="notesSauvegardeEtat" style="font-size:0.68rem; color:var(--text-muted); opacity:0.7; white-space:nowrap;"></span>
+                        <button onclick="supprimerOngletNotesActuel()" title="Supprimer cet onglet" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1rem; flex-shrink:0;">🗑</button>
+                    </div>
+                    <div id="notesToolbar" style="display:flex; align-items:center; gap:4px; padding:8px 16px; border-bottom:1px solid var(--ash); flex-wrap:wrap;">
+                        <button type="button" class="notes-tb-btn" onclick="formaterNote('bold')" title="Gras"><b>G</b></button>
+                        <button type="button" class="notes-tb-btn" onclick="formaterNote('italic')" title="Italique"><i>I</i></button>
+                        <button type="button" class="notes-tb-btn" onclick="formaterNote('formatBlock', 'H3')" title="Titre">H</button>
+                        <button type="button" class="notes-tb-btn" onclick="formaterNote('formatBlock', 'P')" title="Texte normal">¶</button>
+                        <span style="width:1px; height:18px; background:var(--ash); margin:0 4px;"></span>
+                        <button type="button" class="notes-tb-btn" onclick="formaterNote('insertUnorderedList')" title="Liste à puces">•≡</button>
+                        <button type="button" class="notes-tb-btn" onclick="formaterNote('insertOrderedList')" title="Liste numérotée">1≡</button>
+                        <span style="width:1px; height:18px; background:var(--ash); margin:0 4px;"></span>
+                        <button type="button" class="notes-tb-btn" id="notesTbChecklist" onclick="toggleModeChecklistNotes()" title="Mode checklist -- sélectionne du texte pour le transformer en case à cocher">☑</button>
+                        <button type="button" class="notes-tb-btn" id="notesTbCocherSelection" onclick="cocherSelectionNotes()" title="Transformer la sélection en case à cocher" style="display:none; font-size:0.68rem; width:auto; padding:0 10px;">Cocher la sélection</button>
+                    </div>
+                    <div id="notesContenuTextarea" contenteditable="true" oninput="sauvegarderContenuNotesDebounce()" data-placeholder="Écris librement ici -- rappels, méthode, idées en cours..." style="flex:1; overflow-y:auto; outline:none; color:var(--silver-bright); font-family:inherit; font-size:0.88rem; line-height:1.65; padding:20px;"></div>
+                </div>
+            </div>
+            <div id="notesVide" style="display:none; padding:60px 30px; text-align:center; color:var(--text-muted); font-size:0.85rem;">
+                Aucun onglet pour l'instant.<br><span style="cursor:pointer; text-decoration:underline; color:var(--surbrillance);" onclick="creerOngletNotes()">Crée le premier</span>.
+            </div>
+        </div>
+    </div>
+
+<script>
         // Couleurs de graphique adaptées au thème -- les grilles et
         // lignes neutres étaient codées en blanc translucide, invisibles
         // une fois passé en mode clair.
@@ -3861,7 +4130,7 @@
             // suivi ici.
             const noteEl = document.getElementById('periodeContexteNote');
             noteEl.style.display = 'block';
-            noteEl.textContent = "Ce score s'appuie sur les données fournies. S'il a servi de base au réglage de la stratégie, seul le mode Validation — en direct, forcément sur des données nouvelles — confirme une vraie robustesse future.";
+            noteEl.textContent = "Ce score s'appuie sur les données fournies. S'il a servi de base au réglage de la stratégie, seul un suivi en direct sur des données nouvelles confirme une vraie robustesse future.";
 
             // 0. Vue d'ensemble du backtest (sans distinction Référence/Test)
             if (data.global) {
@@ -3872,7 +4141,6 @@
                 document.getElementById('globalPf').textContent = g.profit_factor;
                 document.getElementById('globalNTrades').textContent = g.n_trades;
             }
-            // 0bis. Ratios de performance ajustée au risque
             const panneauRatios = document.getElementById('panneauRatiosPerformance');
             const perfRatios = data.ratios_performance;
             if (perfRatios) {
@@ -4013,7 +4281,6 @@
                 miniRisque.style.display = 'none';
             }
 
-            // Panneau Diagnostic : Qualité, Risque & Score Combiné --
             // n'apparaissent que si le diagnostic correspondant a pu être
             // calculé, pour ne jamais afficher un panneau vide.
             const panneauQualite = document.getElementById('panneauQualite');
@@ -4110,14 +4377,9 @@
             }
 
 
-            // Doit rester synchronisé avec SEUIL_SCORE_VALIDATION côté
-            // backend (api.py) -- le serveur reste la seule source
-            // d'autorité (revérifié à la création), ceci ne pilote que
-            // l'affichage de la bannière.
-            const scoreP10Actuel = rob.score_fourchette ? rob.score_fourchette.p10 : null;
-            const seuilFranchi = scoreP10Actuel !== null && scoreP10Actuel >= SEUIL_SCORE_VALIDATION;
-            document.getElementById('validationUnlockBanner').style.display = seuilFranchi ? 'block' : 'none';
-            if (seuilFranchi) verifierEtAfficherTutorielVO();
+            // Mode Validation masqué pour la v1 -- la bannière ne doit
+            // jamais s'afficher tant qu'il n'est pas réactivé.
+            document.getElementById('validationUnlockBanner').style.display = 'none';
             derniereAnalyseAffichee = data;
 
             const fourchette = rob.score_fourchette;
@@ -4423,6 +4685,10 @@
         // que de répéter la méthode générique déjà expliquée plus bas.
         // ============================================================
         function obtenirPointCle(warnings, diagnosticFiltre) {
+            // Ne résume jamais artificiellement -- montre honnêtement
+            // l'alerte la plus sévère telle quelle (sans son détail
+            // technique entre parenthèses), plutôt que de générer une
+            // phrase de synthèse qui risquerait de trahir la nuance.
             const poidsNiveau = { critical: 0, warning: 1, info: 2 };
             const alertes = warnings.filter(w =>
                 (w.type || 'alerte') === 'alerte' &&
@@ -4649,7 +4915,7 @@
             if (ratio === null || ratio === undefined) return "Pas assez de fenêtres walk-forward exploitables pour calculer un ratio de stabilité médian.";
             const faiblesTxt = fenetresFaibles >= 30 ? ` ${fenetresFaibles}% des fenêtres individuelles sont faibles — la médiane peut masquer une vraie irrégularité d'une période à l'autre.` : '';
             const phrases = [
-                `Le ratio de stabilité médian de ${ratio} signifie que la stratégie perd la grande majorité de son efficacité hors des données utilisées pour la régler — signe classique de surapprentissage.`,
+                `Le ratio de stabilité médian de ${ratio} signifie que la stratégie perd la grande majorité de son efficacité hors des données utilisées pour la régler. Deux causes possibles, à distinguer selon le contexte : si cette stratégie a déjà été réglée ou ajustée sur cet historique, c'est un signe classique de surapprentissage ; si c'est un premier jet jamais ajusté sur ces données, cela veut plus simplement dire que l'edge recherché ne fonctionne pas de façon fiable.`,
                 `Le ratio de stabilité médian de ${ratio} montre une efficacité qui chute sensiblement en dehors de la période de référence — à surveiller de près avant de passer en réel.`,
                 `Le ratio de stabilité médian de ${ratio} montre une efficacité qui se maintient raisonnablement bien d'une période de référence à sa période de test.`,
                 `Le ratio de stabilité médian de ${ratio} montre une efficacité qui se maintient très bien — voire s'améliore — entre la période de référence et la période de test.`,
@@ -4665,7 +4931,7 @@
             if (pathRatio !== null && pathRatio !== undefined && pathRatio >= 4.0) {
                 pathTxt = plancherApplique
                     ? ` Le ratio de sensibilité de trajectoire est techniquement élevé (${pathRatio.toFixed(2)}x), mais le pire drawdown simulé reste négligeable en valeur absolue — le score n'est donc pas pénalisé comme si ce ratio signalait un vrai risque.`
-                    : ` Le drawdown réellement observé semble aussi avoir bénéficié d'un enchaînement de trades favorable (${pathRatio.toFixed(2)}x) — un signal de prudence supplémentaire.`;
+                    : ` Le drawdown réellement observé semble aussi avoir bénéficié d'un enchâînement de trades favorable (${pathRatio.toFixed(2)}x) — un signal de prudence supplémentaire.`;
             }
             const phrases = [
                 `Un facteur de récupération de ${recovery.toFixed(2)} signifie que le profit ne couvre même pas le pire drawdown simulé — la marge de sécurité est insuffisante.`,
@@ -4702,6 +4968,9 @@
                 return;
             }
 
+            // Le détail technique entre parenthèses reste disponible mais
+            // en retrait visuel -- la phrase en clair doit se lire d'un
+            // coup d'œil, le chiffre exact reste à portée pour qui le veut.
             const allegerMessage = (msg) => msg.replace(/\(([^()]*\d[^()]*)\)/g, '<span class="check-item-detail-technique">($1)</span>');
 
             const rendreItem = (w) => {
@@ -5374,7 +5643,7 @@
             }
             const contexteTxt = contexteParts.join(' · ');
             const epreuveBadge = s.n_epreuves_actives > 0
-                ? `<span class="strategy-card-epreuve-badge"><svg viewBox="0 0 24 24" width="8" height="8" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg> ${s.n_epreuves_actives} validation${s.n_epreuves_actives > 1 ? 's' : ''} en cours</span>`
+                ? `<span class="strategy-card-epreuve-badge"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="vertical-align:-1px;"><path d="M12 2 a10 10 0 0 1 7.07 17.07"/></svg> ${s.n_epreuves_actives} validation${s.n_epreuves_actives > 1 ? 's' : ''} en cours</span>`
                 : '';
             const validationBadge = s.validation_reussie
                 ? `<span class="strategy-card-validation-badge" title="Épreuve de Validation réussie le ${formaterDateAffichage(new Date(s.validation_reussie.created_at))} — l'exécution réelle est restée cohérente avec le backtest">✓✓ Validée</span>`
@@ -5402,7 +5671,6 @@
                     <div class="strategy-card-actions">
                         <span style="margin-right:auto; display:flex; gap:8px; flex-wrap:wrap;">
                             ${s.derniere_analyse ? `<span class="strategy-card-action-btn code-btn-full" data-analyse-id="${s.derniere_analyse.id}" onclick="event.stopPropagation(); ouvrirModalCodePourAnalyse(${s.derniere_analyse.id})">${s.derniere_analyse.a_code_source ? '&lt;/&gt; Code' : '+ Ajouter du code'}</span>` : ''}
-                            ${(scoreP10 !== null && scoreP10 >= SEUIL_SCORE_VALIDATION && s.derniere_analyse) ? `<span class="strategy-card-action-btn strategy-card-action-btn-validation" onclick="event.stopPropagation(); envoyerEnValidation(${s.derniere_analyse.id})">→ Envoyer en Validation</span>` : ''}
                         </span>
                         <span class="strategy-card-actions-right">
                             ${s.n_analyses > 1 ? `<span class="strategy-card-action-btn" onclick="event.stopPropagation(); ouvrirModalVersions(${s.id}, '${nomEchappe}')">${s.n_analyses === 2 ? "Voir l'autre version" : `Voir les ${s.n_analyses - 1} autres versions`}</span>` : ''}
@@ -5640,7 +5908,9 @@
             if (!dragCarteInfo || e.pointerId !== dragCarteInfo.pointerId) return;
             const dx = e.clientX - dragCarteInfo.startX;
             const dy = e.clientY - dragCarteInfo.startY;
-            const estEligible = dragCarteInfo.scoreP10 !== null && dragCarteInfo.scoreP10 !== undefined && dragCarteInfo.scoreP10 >= SEUIL_SCORE_VALIDATION;
+            // Aucune porte de score : une stratégie fragile a encore plus
+            // besoin d'être suivie de près qu'une bonne.
+            const estEligible = true;
             if (!dragCarteInfo.enCoursDeDrag) {
                 if (Math.hypot(dx, dy) < DRAG_SEUIL_PX) return;
                 dragCarteInfo.enCoursDeDrag = true;
@@ -5785,30 +6055,118 @@
         // glisser-déposer sur le nœud (desktop) ou via le bouton dédié
         // sur la carte (partout, y compris là où le sélecteur orbital
         // n'est pas visible, comme sur mobile ou en portrait).
+        // Point d'entrée partagé pour démarrer un Suivi à partir d'une
+        // analyse -- que ce soit via le glisser-déposer sur le nœud
+        // (desktop) ou via le bouton dédié sur la carte (partout, y
+        // compris là où le sélecteur orbital n'est pas visible, comme
+        // sur mobile ou en portrait). Le dépôt ouvre maintenant la
+        // configuration des seuils plutôt que de lancer immédiatement --
+        // contrairement à l'ancienne Validation Officielle, un Suivi a
+        // toujours besoin des seuils propres à l'utilisateur.
         async function envoyerEnValidation(analyseId) {
+            dragSuppressionClicProchain = false;
+            await ouvrirModalConfigurerSuivi(analyseId);
+        }
+
+        let suiviAnalyseIdCourante = null;
+        let suiviStrategieIdCourante = null;
+
+        async function ouvrirModalConfigurerSuivi(analyseId) {
+            suiviAnalyseIdCourante = analyseId || null;
+            suiviStrategieIdCourante = null;
+            document.getElementById('modalSuiviNom').value = '';
+            document.getElementById('modalSuiviCapital').value = '';
+            document.getElementById('modalSuiviContexte').value = '';
+            document.getElementById('modalSuiviObjectifProfit').value = '';
+            document.getElementById('modalSuiviDrawdownMax').value = '';
+            document.getElementById('modalSuiviPerteJourMax').value = '';
+            document.getElementById('modalSuiviSeuilAlerte').value = '';
+            document.getElementById('modalSuiviNbTradesMin').value = '';
+            document.getElementById('modalSuiviDureeMin').value = '';
+            document.getElementById('modalSuiviFenetreGlissante').value = '';
+            document.getElementById('modalSuiviError').style.display = 'none';
+
+            if (analyseId) {
+                try {
+                    const resp = await fetch('http://127.0.0.1:8000/historique/' + analyseId);
+                    const data = await resp.json();
+                    const resultat = data.resultat;
+                    suiviStrategieIdCourante = data.strategie_id;
+                    document.getElementById('modalSuiviNom').value = `Suivi — ${data.bot_name || 'Stratégie'}`;
+                    document.getElementById('modalSuiviCapital').value = resultat.capital_initial || '';
+                    const pireMdd = resultat.monte_carlo && resultat.monte_carlo.pire_mdd_95_pct;
+                    if (pireMdd !== null && pireMdd !== undefined) {
+                        document.getElementById('modalSuiviSeuilAlerte').value = Math.abs(Math.round(pireMdd * 10) / 10);
+                        document.getElementById('modalSuiviSubtitle').textContent = `Seuil d'alerte pré-rempli à partir du pire Max Drawdown déjà simulé pour cette stratégie (${Math.abs(pireMdd).toFixed(1)}%) -- reste modifiable avant de démarrer.`;
+                    }
+                } catch (err) {
+                    // Le formulaire reste utilisable même si le pré-remplissage échoue.
+                }
+            } else {
+                document.getElementById('modalSuiviSubtitle').textContent = "Fixez les seuils à respecter avant de commencer -- ils ne changeront plus après, pour éviter de les ajuster après coup selon comment ça se passe.";
+            }
+
+            ouvrirModaleAnimee('modalConfigurerSuivi');
+        }
+
+        function fermerModalConfigurerSuivi() {
+            fermerModaleAnimee('modalConfigurerSuivi');
+        }
+
+        async function lancerCreationSuivi() {
+            const erreurBox = document.getElementById('modalSuiviError');
+            erreurBox.style.display = 'none';
+
+            const nom = document.getElementById('modalSuiviNom').value.trim();
+            const capital = parseFloat(document.getElementById('modalSuiviCapital').value);
+            if (!capital || capital <= 0) {
+                erreurBox.textContent = "Le capital de départ est requis.";
+                erreurBox.style.display = 'block';
+                return;
+            }
+
+            const val = (id) => {
+                const v = document.getElementById(id).value;
+                return v === '' ? null : parseFloat(v);
+            };
+            const valInt = (id) => {
+                const v = document.getElementById(id).value;
+                return v === '' ? null : parseInt(v, 10);
+            };
+
+            const payload = {
+                type_epreuve: 'suivi',
+                nom: nom || null,
+                capital_initial: capital,
+                analyse_id: suiviAnalyseIdCourante,
+                strategie_id: suiviStrategieIdCourante,
+                contexte: document.getElementById('modalSuiviContexte').value.trim() || null,
+                objectif_profit_pct: val('modalSuiviObjectifProfit'),
+                drawdown_max_pct: val('modalSuiviDrawdownMax'),
+                perte_quotidienne_max_pct: val('modalSuiviPerteJourMax'),
+                seuil_alerte_drawdown_pct: val('modalSuiviSeuilAlerte'),
+                nb_trades_min_jugement: valInt('modalSuiviNbTradesMin'),
+                duree_min_jours_jugement: valInt('modalSuiviDureeMin'),
+                taille_fenetre_glissante: valInt('modalSuiviFenetreGlissante'),
+            };
+
             try {
-                // Le dépôt EST le lancement -- plus d'étape intermédiaire
-                // "en attente" à gérer, puisque seule une analyse déjà
-                // éligible peut arriver jusqu'ici.
                 const resp = await fetch('http://127.0.0.1:8000/epreuves', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ analyse_id: analyseId, type_epreuve: 'validation' })
+                    body: JSON.stringify(payload)
                 });
                 const data = await resp.json();
-                if (!resp.ok) { alert(data.detail || "Erreur lors du lancement de la Validation."); return; }
-                // Cet appel-ci est intentionnel, pas un clic accidentel
-                // qui aurait suivi le glissement -- la protection ne
-                // doit pas le bloquer, sinon la navigation vers le
-                // nouveau parcours ne se produit jamais.
-                dragSuppressionClicProchain = false;
+                if (!resp.ok) {
+                    erreurBox.textContent = data.detail || "Erreur lors de la création du suivi.";
+                    erreurBox.style.display = 'block';
+                    return;
+                }
+                fermerModalConfigurerSuivi();
                 basculerModeAccueil('validation_officielle');
-                // La bascule de mode swap son contenu de façon différée
-                // (~400ms) -- ouvrir l'épreuve avant que ce délai soit
-                // passé ferait écraser la navigation par ce switch une
-                // fois qu'il se termine enfin.
                 setTimeout(() => ouvrirEpreuve(data.id), 500);
             } catch (err) {
-                alert("Erreur lors de l'envoi vers la Validation Officielle.");
+                erreurBox.textContent = "Erreur réseau lors de la création du suivi.";
+                erreurBox.style.display = 'block';
             }
         }
 
@@ -5852,14 +6210,10 @@
             }
         }
 
-        // Se joue une seule fois, peu importe lequel des deux
-        // déclencheurs arrive en premier (première visite du mode, ou
-        // premier score assez robuste) -- mémorisé pour ne plus jamais
-        // se relancer une fois vu.
+        // Mode Validation masqué pour la v1 -- ce tutoriel ne doit donc
+        // jamais se déclencher tant qu'il n'est pas réactivé.
         function verifierEtAfficherTutorielVO() {
-            if (localStorage.getItem('xtrunn_tutoriel_vo_vu') === 'true') return;
-            localStorage.setItem('xtrunn_tutoriel_vo_vu', 'true');
-            ouvrirModaleAnimee('modalTutorielVO');
+            return;
         }
 
         function fermerTutorielVO() {
@@ -5879,7 +6233,7 @@
             try {
                 const resp = await fetch('http://127.0.0.1:8000/epreuves');
                 const data = await resp.json();
-                const validations = data.epreuves.filter(ep => ep.type_epreuve === 'validation');
+                const validations = data.epreuves.filter(ep => ep.type_epreuve === 'suivi');
                 voListeCache = validations;
 
                 const liste = document.getElementById('voListe');
@@ -5890,20 +6244,15 @@
                 } else {
                     sansCandidat.style.display = 'none';
                     liste.innerHTML = '<div class="strategy-card-versions-list">' + validations.map(ep => {
-                        const date = formaterDateAffichage(new Date(ep.created_at));
-                        let etatTxt, cls;
-                        if (ep.statut === 'en_cours') {
-                            etatTxt = `Épreuve en cours — ${ep.jours_ecoules}/${ep.duree_jours} jours`; cls = 'warning';
-                        } else if (ep.statut === 'reussi') {
-                            etatTxt = '✓✓ Certifié — voir le verdict'; cls = 'positive';
-                        } else {
-                            etatTxt = 'Terminé — voir le verdict'; cls = 'negative';
-                        }
+                        const couleurs = { sain: 'var(--success)', a_surveiller: 'var(--warning)', coupe: 'var(--danger)' };
+                        const labels = { sain: 'SAIN', a_surveiller: 'À SURVEILLER', coupe: 'COUPE' };
+                        const couleur = couleurs[ep.statut] || 'var(--text-muted)';
+                        const ddTxt = ep.drawdown_max_pct ? `${ep.drawdown_pct}% / ${ep.drawdown_max_pct}%` : `${ep.drawdown_pct}%`;
                         return `
-                            <div class="strategy-card-version-row v-open" onclick="ouvrirParcoursValidation(${ep.id})">
+                            <div class="strategy-card-version-row v-open" onclick="ouvrirEpreuve(${ep.id})">
                                 <span class="v-open-infos">
-                                    <span class="strategy-card-version-score ${cls}">${ep.analyse_score_p10 ?? '--'}</span>
-                                    <span>${ep.strategie_nom || '--'} — ${date} · ${etatTxt}</span>
+                                    <span class="strategy-card-version-score" style="color:${couleur}; border-color:${couleur}; min-width:96px; text-align:center;">${labels[ep.statut] || ep.statut}</span>
+                                    <span>${echapperHtmlSuivi(ep.nom)}${ep.contexte ? ' · ' + echapperHtmlSuivi(ep.contexte) : ''} — ${ep.n_trades} trade(s) · drawdown max ${ddTxt}</span>
                                 </span>
                             </div>
                         `;
@@ -5929,11 +6278,7 @@
         function ouvrirParcoursValidation(epreuveId) {
             const ep = voListeCache.find(v => v.id === epreuveId);
             if (!ep) return;
-            if (ep.statut === 'en_cours') {
-                ouvrirEpreuve(ep.id);
-            } else {
-                afficherEtape3Validation(ep);
-            }
+            ouvrirEpreuve(ep.id);
         }
 
         function afficherEtape3Validation(ep) {
@@ -5976,10 +6321,11 @@
                 if (trouIntérieur) trouIntérieur.classList.add('ignited');
                 animerVoyage('plonger', () => {
                     afficherEpreuveScreen();
-                    if (c.nouvelle_revelation) {
+                    preparerCoqueEpreuve(c);
+                    if (c.type_epreuve !== 'suivi' && c.nouvelle_revelation) {
                         jouerRevelationEpreuve(c);
                     } else {
-                        renderEcranEpreuve(c);
+                        routerRenduEpreuve(c);
                     }
                 });
             } catch (err) {
@@ -6039,9 +6385,269 @@
             try {
                 const resp = await fetch('http://127.0.0.1:8000/epreuves/' + epreuveIdCourante);
                 const c = await resp.json();
-                renderEcranEpreuve(c);
+                routerRenduEpreuve(c);
             } catch (err) {
                 alert("Impossible de charger cette épreuve.");
+            }
+        }
+
+        // Le Suivi partage la coquille de l'écran Épreuve (retour, rail,
+        // en-tête) mais pas son contenu : ni compte à rebours, ni fin
+        // figée, ni score caché. Cette bascule pose la coquille dans le
+        // bon état selon le type, dans les deux sens.
+        function preparerCoqueEpreuve(c) {
+            const estSuivi = c.type_epreuve === 'suivi';
+            const etaitSuivi = document.body.classList.contains('type-suivi');
+            document.body.classList.toggle('type-suivi', estSuivi);
+            if (!estSuivi) {
+                const lbl = document.getElementById('epDetailStatutLabel');
+                lbl.style.color = '';
+                lbl.style.borderColor = '';
+                if (etaitSuivi) {
+                    document.getElementById('mod-suivi').classList.remove('active');
+                    changerOngletEpreuve('progression', document.querySelector('#epreuveRailNav .sub-tab'));
+                }
+            }
+        }
+
+        function routerRenduEpreuve(c) {
+            preparerCoqueEpreuve(c);
+            if (c.type_epreuve === 'suivi') {
+                renderEcranSuivi(c);
+            } else {
+                renderEcranEpreuve(c);
+            }
+        }
+
+        function echapperHtmlSuivi(texte) {
+            return String(texte === null || texte === undefined ? '' : texte)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function renderEcranSuivi(c) {
+            const devise = (typeof deviseSymbole !== 'undefined') ? deviseSymbole : '$';
+            const nd = (v, suffixe) => (v === null || v === undefined) ? '--' : v + (suffixe || '');
+
+            const habillage = {
+                sain: { label: 'SAIN', couleur: 'var(--success)', message: "Aucun signal inquiétant pour l'instant. Continuez normalement -- en gardant un œil sur vos seuils." },
+                a_surveiller: { label: 'À SURVEILLER', couleur: 'var(--warning)', message: "Un signal d'alerte est apparu, sans qu'aucune limite dure ne soit franchie. Réduisez la taille des positions et resserrez la surveillance plutôt que de tout couper sur un signal encore incertain." },
+                coupe: { label: 'COUPE', couleur: 'var(--danger)', message: "Une limite dure a été franchie. Arrêtez la stratégie : ce seuil n'est pas négociable." },
+            };
+            const h = habillage[c.statut] || habillage.sain;
+
+            // --- en-tête partagé avec la coquille ---
+            const lbl = document.getElementById('epDetailStatutLabel');
+            lbl.textContent = h.label;
+            lbl.className = 'epreuve-hero-compact-statut';
+            lbl.style.color = h.couleur;
+            lbl.style.borderColor = h.couleur;
+            document.getElementById('epDetailNom').textContent = c.nom;
+            document.getElementById('epRailNom').textContent = c.nom;
+            document.getElementById('epRailStatut').textContent = h.label;
+            const lienBox = document.getElementById('epDetailStrategieLien');
+            if (c.strategie_nom) {
+                lienBox.style.display = 'block';
+                lienBox.textContent = `Suit : ${c.strategie_nom}` + (c.contexte ? ` · ${c.contexte}` : '');
+            } else if (c.contexte) {
+                lienBox.style.display = 'block';
+                lienBox.textContent = c.contexte;
+            } else {
+                lienBox.style.display = 'none';
+            }
+
+            // --- une seule section visible ---
+            document.querySelectorAll('#epreuveScreen .module-section').forEach(s => s.classList.remove('active'));
+            document.getElementById('mod-suivi').classList.add('active');
+
+            // --- statut ---
+            const grand = document.getElementById('suiviStatutGrand');
+            grand.textContent = h.label;
+            grand.style.color = h.couleur;
+            document.getElementById('suiviStatutMessage').textContent = c.n_trades === 0
+                ? "Aucun trade enregistré pour l'instant. Ajoutez-en ci-dessous, à la main ou par import."
+                : h.message;
+
+            const bandeau = document.getElementById('suiviBandeauDonnees');
+            if (!c.donnees_suffisantes) {
+                let txt = `Pas encore assez de données pour juger : ${c.n_trades} trade(s)`;
+                if (c.nb_trades_min_jugement) txt += ` sur ${c.nb_trades_min_jugement} minimum`;
+                if (c.duree_min_jours_jugement) txt += `, ${c.jours_trading} jour(s) de trading sur ${c.duree_min_jours_jugement} minimum`;
+                txt += ". En attendant, seules les limites dures peuvent déclencher « Coupe » ; le reste reste « Sain » par défaut, ce qui ne prouve encore rien.";
+                bandeau.textContent = txt;
+                bandeau.style.display = 'block';
+            } else {
+                bandeau.style.display = 'none';
+            }
+
+            const raisonsBox = document.getElementById('suiviRaisons');
+            if (c.raisons && c.raisons.length) {
+                raisonsBox.innerHTML = c.raisons.map(r => `<div class="method-note" style="border-color:${h.couleur}; margin-bottom:8px;"><span class="method-note-icon" style="color:${h.couleur};">⚠</span><p>${echapperHtmlSuivi(r)}</p></div>`).join('');
+            } else {
+                raisonsBox.innerHTML = '';
+            }
+
+            // --- jauge de drawdown ---
+            const dd = c.drawdown_pct || 0;
+            const alerte = c.seuil_alerte_drawdown_pct || null;
+            const dur = c.drawdown_max_pct || null;
+            const jaugeBox = document.getElementById('suiviJauge');
+            if (!alerte && !dur) {
+                jaugeBox.innerHTML = `<p style="font-size:0.8rem; color:var(--text-muted);">Aucun seuil de drawdown défini pour ce suivi. Drawdown max atteint : ${dd.toFixed(2)}%.</p>`;
+            } else {
+                const echelle = Math.max(dur || 0, (alerte || 0) * 1.25, dd * 1.1, 0.5);
+                const pos = (v) => Math.min(100, v / echelle * 100);
+                const marqueur = (v, couleur, texte, haut) => `
+                    <div style="position:absolute; left:${pos(v)}%; top:-6px; bottom:-6px; width:2px; background:${couleur};"></div>
+                    <div style="position:absolute; left:${pos(v)}%; ${haut ? 'top:-26px;' : 'top:22px;'} transform:translateX(${pos(v) > 85 ? '-100%' : (pos(v) < 15 ? '0%' : '-50%')}); font-size:0.66rem; color:${couleur}; white-space:nowrap;">${texte}</div>`;
+                jaugeBox.innerHTML = `
+                    <div style="position:relative; height:16px; background:var(--ash); border-radius:8px; margin:34px 0 40px;">
+                        <div style="position:absolute; left:0; top:0; bottom:0; width:${pos(dd)}%; background:${h.couleur}; border-radius:8px; transition:width 0.4s;"></div>
+                        ${alerte ? marqueur(alerte, 'var(--warning)', `Alerte ${alerte}%`, true) : ''}
+                        ${dur ? marqueur(dur, 'var(--danger)', `Limite dure ${dur}%`, false) : ''}
+                    </div>
+                    <div style="font-size:0.8rem; color:var(--text-muted);">Drawdown max atteint : <strong style="color:var(--horizon);">${dd.toFixed(2)}%</strong> (${(c.drawdown_dollars || 0).toFixed(2)} ${devise})</div>`;
+            }
+
+            // --- chiffres clés ---
+            const profitEl = document.getElementById('suiviKpiProfit');
+            profitEl.textContent = `${c.profit_net >= 0 ? '+' : ''}${(c.profit_net || 0).toFixed(2)} ${devise} (${c.profit_pct >= 0 ? '+' : ''}${(c.profit_pct || 0).toFixed(2)}%)`;
+            profitEl.className = 'mc-info-val ' + ((c.profit_net || 0) >= 0 ? 'positive' : 'negative');
+            document.getElementById('suiviKpiDrawdown').textContent = `${dd.toFixed(2)}%`;
+            document.getElementById('suiviKpiPireJour').textContent = `${(c.pire_jour_pct || 0).toFixed(2)}%`;
+            document.getElementById('suiviKpiTrades').textContent = `${c.n_trades} / ${c.jours_trading} j`;
+
+            const fen = c.fenetre_glissante;
+            const fenBloc = document.getElementById('suiviFenetreBloc');
+            if (fen) {
+                fenBloc.style.display = 'block';
+                document.getElementById('suiviFenetreTitre').textContent = 'Trades pris en compte';
+                document.getElementById('suiviFenetreN').textContent = fen.n_trades_fenetre;
+                document.getElementById('suiviFenetrePf').textContent = fen.profit_factor_fenetre === null ? '∞ (aucune perte)' : fen.profit_factor_fenetre;
+                document.getElementById('suiviFenetreWr').textContent = `${fen.winrate_fenetre_pct}%`;
+            } else {
+                fenBloc.style.display = 'none';
+            }
+
+            // --- courbe de capital ---
+            const pts = c.courbe || [];
+            const courbeBox = document.getElementById('suiviCourbe');
+            if (pts.length < 2) {
+                courbeBox.innerHTML = '<p style="font-size:0.8rem; color:var(--text-muted);">La courbe apparaîtra dès le premier trade.</p>';
+            } else {
+                const W = 640, H = 160, P = 8;
+                const mn = Math.min(...pts, c.capital_initial), mx = Math.max(...pts, c.capital_initial);
+                const span = (mx - mn) || 1;
+                const px = (i) => P + i / (pts.length - 1) * (W - 2 * P);
+                const py = (v) => H - P - (v - mn) / span * (H - 2 * P);
+                const poly = pts.map((v, i) => `${px(i).toFixed(1)},${py(v).toFixed(1)}`).join(' ');
+                const yBase = py(c.capital_initial).toFixed(1);
+                const couleurCourbe = pts[pts.length - 1] >= c.capital_initial ? 'var(--success)' : 'var(--danger)';
+                courbeBox.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;"><line x1="${P}" x2="${W - P}" y1="${yBase}" y2="${yBase}" style="stroke:var(--ash-bright); stroke-dasharray:4 4;"></line><polyline points="${poly}" style="fill:none; stroke:${couleurCourbe}; stroke-width:2; stroke-linejoin:round;"></polyline></svg>`;
+            }
+
+            // --- historique ---
+            const trades = (c.trades || []).slice().reverse();
+            document.getElementById('suiviNbTradesListe').textContent = trades.length ? `(${trades.length})` : '';
+            const listeBox = document.getElementById('suiviListeTrades');
+            if (!trades.length) {
+                listeBox.innerHTML = '<p style="font-size:0.8rem; color:var(--text-muted);">Aucun trade pour l\'instant.</p>';
+            } else {
+                listeBox.innerHTML = trades.map(t => `
+                    <div style="display:flex; align-items:center; gap:12px; padding:8px 4px; border-bottom:1px solid var(--ash); font-size:0.78rem;">
+                        <span style="min-width:86px; color:var(--text-muted);">${echapperHtmlSuivi(t.date)}</span>
+                        <span style="min-width:70px; color:var(--text-muted);">${echapperHtmlSuivi(t.symbole || '--')}</span>
+                        <span class="${t.profit >= 0 ? 'positive' : 'negative'}" style="min-width:90px; font-weight:600;">${t.profit >= 0 ? '+' : ''}${Number(t.profit).toFixed(2)} ${devise}</span>
+                        <span style="flex:1; color:var(--text-muted); opacity:0.8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${echapperHtmlSuivi(t.notes || '')}</span>
+                        <span style="font-size:0.66rem; color:var(--text-muted); opacity:0.6;">${t.source === 'import_fichier' ? 'import' : 'manuel'}</span>
+                        <button onclick="supprimerTradeEpreuve(${t.id})" title="Supprimer ce trade" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:0.9rem;">✕</button>
+                    </div>`).join('');
+            }
+
+            // --- rappel des seuils fixés ---
+            const lignes = [
+                ['Contexte', c.contexte || 'non précisé'],
+                ['Capital de départ', `${c.capital_initial} ${devise}`],
+                ['Drawdown max (limite dure)', nd(c.drawdown_max_pct, '%')],
+                ['Perte journalière max (limite dure)', nd(c.perte_quotidienne_max_pct, '%')],
+                ['Objectif de profit', nd(c.objectif_profit_pct, '%')],
+                ["Seuil d'alerte interne (drawdown)", nd(c.seuil_alerte_drawdown_pct, '%')],
+                ['Trades minimum avant de juger', nd(c.nb_trades_min_jugement)],
+                ['Jours minimum avant de juger', nd(c.duree_min_jours_jugement)],
+                ['Fenêtre glissante', c.taille_fenetre_glissante ? `${c.taille_fenetre_glissante} derniers trades` : '--'],
+                ['Suivi démarré le', (c.date_debut || '').slice(0, 10)],
+            ];
+            document.getElementById('suiviResumeSeuils').innerHTML = lignes.map(([k, v]) => `<div style="display:flex; justify-content:space-between; gap:16px; border-bottom:1px solid var(--ash);"><span>${k}</span><strong style="color:var(--horizon); font-weight:600;">${echapperHtmlSuivi(v)}</strong></div>`).join('');
+
+            // --- date par défaut du formulaire d'ajout ---
+            const dateInput = document.getElementById('suiviTradeDate');
+            if (!dateInput.value) {
+                const now = new Date();
+                dateInput.value = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+            }
+        }
+
+        async function ajouterTradeSuivi() {
+            const date = document.getElementById('suiviTradeDate').value;
+            const profit = document.getElementById('suiviTradeProfit').value;
+            if (!date || profit === '') {
+                alert("Merci de renseigner une date et un montant.");
+                return;
+            }
+            const payload = { date: date, profit: parseFloat(profit) };
+            const symbole = document.getElementById('suiviTradeSymbole').value.trim();
+            if (symbole) payload.symbole = symbole;
+            const notes = document.getElementById('suiviTradeNotes').value.trim();
+            if (notes) payload.notes = notes;
+            try {
+                const resp = await fetch('http://127.0.0.1:8000/epreuves/' + epreuveIdCourante + '/trades', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!resp.ok) {
+                    alert("Ce trade n'a pas pu être enregistré.");
+                    return;
+                }
+                document.getElementById('suiviTradeProfit').value = '';
+                document.getElementById('suiviTradeSymbole').value = '';
+                document.getElementById('suiviTradeNotes').value = '';
+                rafraichirEcranEpreuve();
+            } catch (err) {
+                alert("Erreur lors de l'ajout du trade.");
+            }
+        }
+
+        async function importerTradesSuivi() {
+            const file = document.getElementById('suiviImportFile').files[0];
+            const msg = document.getElementById('suiviImportMsg');
+            msg.style.display = 'none';
+            if (!file) {
+                msg.textContent = "Veuillez sélectionner un fichier.";
+                msg.style.color = 'var(--danger)';
+                msg.style.display = 'block';
+                return;
+            }
+            const formData = new FormData();
+            formData.append('trades_file', file);
+            formData.append('plateforme', document.getElementById('suiviImportPlateforme').value);
+            try {
+                const resp = await fetch('http://127.0.0.1:8000/epreuves/' + epreuveIdCourante + '/trades/import', { method: 'POST', body: formData });
+                const data = await resp.json();
+                if (data.erreur || !resp.ok) {
+                    msg.textContent = data.erreur || data.detail || "Import impossible.";
+                    msg.style.color = 'var(--danger)';
+                    msg.style.display = 'block';
+                    return;
+                }
+                document.getElementById('suiviImportFile').value = '';
+                await rafraichirEcranEpreuve();
+                msg.textContent = data.message;
+                msg.style.color = 'var(--success)';
+                msg.style.display = 'block';
+            } catch (err) {
+                msg.textContent = "Erreur de connexion au backend.";
+                msg.style.color = 'var(--danger)';
+                msg.style.display = 'block';
             }
         }
 
@@ -6664,6 +7270,7 @@
         // Pré-remplissage de la liste des noms de stratégies déjà connues au démarrage
         rafraichirListeNoms();
         chargerStrategies();
+        chargerPastillesEpinglesInitial();
 
         // Standard reste le choix par défaut pour qui n'a jamais rien
         // choisi -- mais un protocole change rarement d'une analyse à
@@ -7657,43 +8264,6 @@
         appliquerCouleurRail(); // dès le chargement
         appliquerCouleurEntete();
 
-        // COULEUR DU RAIL EN MODE VALIDATION -- indépendante de celle du
-        // rail en mode Analyse : #epreuveRailNav et #railNav sont deux
-        // éléments DOM distincts, chacun avec sa propre variable CSS
-        // (voir la règle #epreuveRailNav dédiée), donc aucun conflit
-        // possible entre les deux réglages.
-        let couleurRailValidation = localStorage.getItem('xtrunn_couleur_rail_validation') || null;
-        let dernierPersoRailValidation = localStorage.getItem('xtrunn_dernier_perso_rail_validation') || null;
-
-        function appliquerCouleurRailValidation() {
-            if (couleurRailValidation) {
-                document.documentElement.style.setProperty('--rail-validation-teinte-rgb', couleurRailValidation);
-                document.documentElement.style.setProperty('--rail-validation-teinte-alpha', OPACITE_TEINTE_RAIL);
-            } else {
-                document.documentElement.style.setProperty('--rail-validation-teinte-alpha', '0');
-            }
-        }
-        function rendreNuancesRailValidation() { rendreNuanceGenerique('paramsNuancesRailValidation', couleurRailValidation, dernierPersoRailValidation, 'choisirCouleurRailValidation', 'ouvrirPickerRailValidation'); }
-        function choisirCouleurRailValidation(valeur) {
-            couleurRailValidation = valeur;
-            if (valeur === null) { localStorage.removeItem('xtrunn_couleur_rail_validation'); } else { localStorage.setItem('xtrunn_couleur_rail_validation', valeur); }
-            appliquerCouleurRailValidation();
-            rendreNuancesRailValidation();
-        }
-        function ouvrirPickerRailValidation(declencheur) {
-            const actuel = couleurRailValidation ? rgbVersHex(couleurRailValidation) : (dernierPersoRailValidation || (document.documentElement.getAttribute('data-theme') === 'clair' ? '#141416' : '#ece9e4'));
-            ouvrirSelecteurCouleurPerso(declencheur, actuel,
-                (hex) => { document.documentElement.style.setProperty('--rail-validation-teinte-rgb', hexVersRgb(hex)); document.documentElement.style.setProperty('--rail-validation-teinte-alpha', OPACITE_TEINTE_RAIL); },
-                () => {
-                    const hex = '#' + document.getElementById('colorPickerHexInput').value;
-                    ajouterHistoriqueCouleur(hex);
-                    dernierPersoRailValidation = hex;
-                    try { localStorage.setItem('xtrunn_dernier_perso_rail_validation', hex); } catch (err) { /* stockage indisponible, tant pis */ }
-                    choisirCouleurRailValidation(hexVersRgb(hex));
-                });
-        }
-        appliquerCouleurRailValidation(); // dès le chargement
-
         function rendreNuancesTrouNoir() {
             const conteneur = document.getElementById('paramsNuancesTrouNoir');
             const defautClasse = couleurTrouNoir === null ? ' selectionnee' : '';
@@ -7739,6 +8309,7 @@
 
         function rendreNuancesTrouNoirValidation() {
             const conteneur = document.getElementById('paramsNuancesTrouNoirValidation');
+            if (!conteneur) return;
             let html = NUANCES_TROU_NOIR_VALIDATION.map(n => `
                 <div class="param-nuance-swatch${n.valeur === couleurTrouNoirValidation ? ' selectionnee' : ''}" style="background:rgb(${n.valeur});" title="${n.nom}" onclick="choisirCouleurTrouNoirValidation('${n.valeur}')"></div>
             `).join('');
@@ -7843,6 +8414,373 @@
             }
         }
 
+        // ============================================================
+        // NOTES -- espace libre, structure entierement par l'utilisateur
+        // (ses propres onglets, ses propres noms). Jamais de structure
+        // imposee par XTRUNN ici, contrairement au journal de methode
+        // que l'utilisateur peut choisir d'y coller lui-meme.
+        // ============================================================
+        let notesOnglets = [];
+        let noteOngletActifId = null;
+        let notesDebounceRenommer = null;
+        let notesDebounceContenu = null;
+        let modeChecklistNotesActif = false;
+
+        function formaterNote(commande, valeur) {
+            document.getElementById('notesContenuTextarea').focus();
+            document.execCommand(commande, false, valeur || null);
+            sauvegarderContenuNotesDebounce();
+        }
+
+        function toggleModeChecklistNotes() {
+            modeChecklistNotesActif = !modeChecklistNotesActif;
+            document.getElementById('notesTbChecklist').classList.toggle('actif', modeChecklistNotesActif);
+            document.getElementById('notesTbCocherSelection').style.display = modeChecklistNotesActif ? 'flex' : 'none';
+        }
+
+        function cocherSelectionNotes() {
+            const zone = document.getElementById('notesContenuTextarea');
+            const sel = window.getSelection();
+            if (!sel.rangeCount || sel.isCollapsed) {
+                alert("Sélectionne d'abord le texte à transformer en case à cocher.");
+                return;
+            }
+            const range = sel.getRangeAt(0);
+            if (!zone.contains(range.commonAncestorContainer)) {
+                alert("La sélection doit se trouver dans la zone de notes.");
+                return;
+            }
+            const texte = range.toString();
+            if (!texte.trim()) return;
+
+            const item = document.createElement('span');
+            item.className = 'note-check-item';
+            item.setAttribute('contenteditable', 'false');
+            item.innerHTML = `<input type="checkbox" onchange="toggleNoteCheckbox(this)"><span class="note-check-label">${echapperHtmlNotes(texte)}</span>`;
+            range.deleteContents();
+            range.insertNode(item);
+            item.after(document.createTextNode('\u00A0'));
+            sel.removeAllRanges();
+            sauvegarderContenuNotesDebounce();
+        }
+
+        function toggleNoteCheckbox(checkbox) {
+            checkbox.closest('.note-check-item').classList.toggle('coche', checkbox.checked);
+            sauvegarderContenuNotesDebounce();
+        }
+
+        function echapperHtmlNotes(texte) {
+            return String(texte === null || texte === undefined ? '' : texte)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        async function chargerPastillesEpinglesInitial() {
+            try {
+                const resp = await fetch('http://127.0.0.1:8000/notes');
+                const data = await resp.json();
+                notesOnglets = data.onglets || [];
+                renderChipsEpinglesHeader();
+            } catch (err) { /* silencieux -- l'en-tete reste simplement sans pastilles */ }
+        }
+
+        function renderChipsEpinglesHeader() {
+            const conteneur = document.getElementById('notesChipsEpingles');
+            const epingles = notesOnglets.filter(o => o.epingle);
+            conteneur.innerHTML = epingles.map(o => `
+                <button class="notes-chip-epingle" onclick="ouvrirPanneauNotes(${o.id})" title="${echapperHtmlNotes(o.nom)}">${echapperHtmlNotes(o.nom)}</button>
+            `).join('');
+        }
+
+        async function ouvrirPanneauNotes(ongletCibleId) {
+            ouvrirModaleAnimee('modalNotes');
+            try {
+                const resp = await fetch('http://127.0.0.1:8000/notes');
+                const data = await resp.json();
+                notesOnglets = data.onglets || [];
+                renderChipsEpinglesHeader();
+                if (notesOnglets.length === 0) {
+                    noteOngletActifId = null;
+                    renderListeOngletsNotes();
+                    document.getElementById('notesVide').style.display = 'block';
+                    document.getElementById('notesEspaceTravail').style.display = 'none';
+                    return;
+                }
+                document.getElementById('notesVide').style.display = 'none';
+                document.getElementById('notesEspaceTravail').style.display = 'flex';
+                const dernierActifId = parseInt(localStorage.getItem('xtrunn_dernier_onglet_notes') || '', 10);
+                const cible = (ongletCibleId !== undefined && notesOnglets.find(o => o.id === ongletCibleId))
+                    || notesOnglets.find(o => o.id === dernierActifId) || notesOnglets[0];
+                selectionnerOngletNotes(cible.id);
+            } catch (err) {
+                alert("Impossible de charger les notes.");
+            }
+        }
+
+        function fermerPanneauNotes() {
+            fermerModaleAnimee('modalNotes');
+        }
+
+        function renderListeOngletsNotes() {
+            const liste = document.getElementById('notesListeOnglets');
+            liste.innerHTML = notesOnglets.map(o => `
+                <div onclick="selectionnerOngletNotes(${o.id})" style="padding:10px 10px; margin:2px 0; border-radius:7px; cursor:pointer; font-size:0.82rem; display:flex; align-items:center; gap:6px; ${o.id === noteOngletActifId ? 'background:rgba(255,255,255,0.06); color:var(--horizon);' : 'color:var(--text-muted);'}">
+                    <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${echapperHtmlNotes(o.nom)}</span>
+                    <span onclick="event.stopPropagation(); toggleEpingleOnglet(${o.id})" title="${o.epingle ? 'Désépingler' : 'Épingler dans l\u2019en-tête'}" style="flex-shrink:0; opacity:${o.epingle ? '1' : '0.35'}; font-size:0.78rem;">📌</span>
+                </div>
+            `).join('');
+        }
+
+        async function toggleEpingleOnglet(id) {
+            const onglet = notesOnglets.find(o => o.id === id);
+            if (!onglet) return;
+            onglet.epingle = !onglet.epingle;
+            renderListeOngletsNotes();
+            renderChipsEpinglesHeader();
+            try {
+                await fetch('http://127.0.0.1:8000/notes/' + id, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ epingle: onglet.epingle })
+                });
+            } catch (err) { /* l'etat visuel reste correct meme si la sauvegarde echoue ponctuellement */ }
+        }
+
+        function selectionnerOngletNotes(id) {
+            noteOngletActifId = id;
+            localStorage.setItem('xtrunn_dernier_onglet_notes', id);
+            const onglet = notesOnglets.find(o => o.id === id);
+            if (!onglet) return;
+            document.getElementById('notesNomOngletInput').value = onglet.nom;
+            document.getElementById('notesContenuTextarea').innerHTML = onglet.contenu;
+            document.getElementById('notesTbChecklist').classList.remove('actif');
+            document.getElementById('notesTbCocherSelection').style.display = 'none';
+            modeChecklistNotesActif = false;
+            document.getElementById('notesSauvegardeEtat').textContent = '';
+            renderListeOngletsNotes();
+        }
+
+        async function creerOngletNotes() {
+            try {
+                const resp = await fetch('http://127.0.0.1:8000/notes', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nom: 'Nouvel onglet' })
+                });
+                const nouveau = await resp.json();
+                notesOnglets.push(nouveau);
+                document.getElementById('notesVide').style.display = 'none';
+                document.getElementById('notesEspaceTravail').style.display = 'flex';
+                selectionnerOngletNotes(nouveau.id);
+                document.getElementById('notesNomOngletInput').select();
+            } catch (err) {
+                alert("Erreur lors de la création de l'onglet.");
+            }
+        }
+
+        async function supprimerOngletNotesActuel() {
+            if (noteOngletActifId === null) return;
+            if (!(await confirmerAction("Supprimer cet onglet et tout son contenu ? Cette action est définitive."))) return;
+            try {
+                await fetch('http://127.0.0.1:8000/notes/' + noteOngletActifId, { method: 'DELETE' });
+                notesOnglets = notesOnglets.filter(o => o.id !== noteOngletActifId);
+                renderChipsEpinglesHeader();
+                if (notesOnglets.length === 0) {
+                    noteOngletActifId = null;
+                    renderListeOngletsNotes();
+                    document.getElementById('notesVide').style.display = 'block';
+                    document.getElementById('notesEspaceTravail').style.display = 'none';
+                } else {
+                    selectionnerOngletNotes(notesOnglets[0].id);
+                }
+            } catch (err) {
+                alert("Erreur lors de la suppression.");
+            }
+        }
+
+        function renommerOngletNotesDebounce() {
+            clearTimeout(notesDebounceRenommer);
+            const nouveauNom = document.getElementById('notesNomOngletInput').value;
+            notesDebounceRenommer = setTimeout(async () => {
+                if (noteOngletActifId === null) return;
+                try {
+                    await fetch('http://127.0.0.1:8000/notes/' + noteOngletActifId, {
+                        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ nom: nouveauNom })
+                    });
+                    const onglet = notesOnglets.find(o => o.id === noteOngletActifId);
+                    if (onglet) onglet.nom = nouveauNom.trim() || onglet.nom;
+                    renderListeOngletsNotes();
+                    renderChipsEpinglesHeader();
+                } catch (err) { /* silencieux -- pas de coupure du flux d'écriture pour une erreur reseau ponctuelle */ }
+            }, 500);
+        }
+
+        function sauvegarderContenuNotesDebounce() {
+            clearTimeout(notesDebounceContenu);
+            const etat = document.getElementById('notesSauvegardeEtat');
+            etat.textContent = '...';
+            const contenu = document.getElementById('notesContenuTextarea').innerHTML;
+            notesDebounceContenu = setTimeout(async () => {
+                if (noteOngletActifId === null) return;
+                try {
+                    await fetch('http://127.0.0.1:8000/notes/' + noteOngletActifId, {
+                        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ contenu: contenu })
+                    });
+                    const onglet = notesOnglets.find(o => o.id === noteOngletActifId);
+                    if (onglet) onglet.contenu = contenu;
+                    etat.textContent = 'Enregistré';
+                    setTimeout(() => { if (etat.textContent === 'Enregistré') etat.textContent = ''; }, 1500);
+                } catch (err) {
+                    etat.textContent = 'Erreur';
+                }
+            }, 600);
+        }
+
+        // ============================================================
+        // BACKTESTING -- bac à sable pour lancer un script Python deja
+        // ecrit (typiquement par une IA), sans jamais avoir besoin d'un
+        // terminal ni d'installer Python. Execution isolee cote serveur,
+        // avec delai limite -- voir /backtesting/executer dans api.py.
+        // ============================================================
+        function ouvrirPanneauBacktesting() {
+            document.getElementById('approachScreen').style.display = 'none';
+            document.getElementById('insideScreen').style.display = 'none';
+            document.getElementById('epreuveScreen').style.display = 'none';
+            document.getElementById('backtestingScreen').style.display = 'block';
+            document.getElementById('railNav').style.display = 'none';
+            document.getElementById('railToggle').style.display = 'none';
+            document.getElementById('epreuveRailNav').style.display = 'none';
+            document.getElementById('backToApproach').style.display = 'flex';
+            document.getElementById('orbitScoresGroupe').style.display = 'none';
+            masquerSelecteurs();
+            document.body.classList.remove('etat-approach', 'etat-inside', 'etat-epreuve');
+            document.body.classList.add('etat-backtesting');
+        }
+
+        function fermerPanneauBacktesting() {
+            retournerVersApproche();
+        }
+
+        function echapperHtmlBacktesting(texte) {
+            return String(texte === null || texte === undefined ? '' : texte)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        async function lancerScriptBacktesting() {
+            const script = document.getElementById('btScriptTextarea').value;
+            const etat = document.getElementById('btEtatExecution');
+            const bouton = document.getElementById('btBoutonLancer');
+            const zoneSimple = document.getElementById('btZoneSortieSimple');
+            const contenuSimple = document.getElementById('btContenuSortieSimple');
+            const zoneFichiers = document.getElementById('btZoneFichiers');
+            const dashboard = document.getElementById('btDashboard');
+
+            if (!script.trim()) {
+                alert("Colle d'abord un script à exécuter.");
+                return;
+            }
+
+            bouton.disabled = true;
+            bouton.textContent = 'En cours...';
+            etat.textContent = 'Exécution en cours (jusqu\u2019à 60s)...';
+            etat.style.color = 'var(--text-muted)';
+            zoneSimple.style.display = 'none';
+            zoneFichiers.style.display = 'none';
+            dashboard.style.display = 'none';
+
+            try {
+                const formData = new FormData();
+                formData.append('script', script);
+                formData.append('capital_initial', document.getElementById('btCapitalInitial').value || 10000);
+                const fichier = document.getElementById('btFichierDonnees').files[0];
+                if (fichier) formData.append('fichier_donnees', fichier);
+
+                const resp = await fetch('http://127.0.0.1:8000/backtesting/executer', { method: 'POST', body: formData });
+                const data = await resp.json();
+
+                if (data.timed_out) {
+                    etat.textContent = 'Arrêté (délai dépassé -- boucle infinie ?)';
+                    etat.style.color = 'var(--danger)';
+                } else if (data.code_retour !== 0) {
+                    etat.textContent = `Erreur (code ${data.code_retour})`;
+                    etat.style.color = 'var(--danger)';
+                } else {
+                    etat.textContent = 'Terminé';
+                    etat.style.color = 'var(--success)';
+                }
+
+                // Fichiers produits (tous, y compris trades.csv lui-meme) --
+                // toujours montres, meme quand le tableau de bord s'affiche.
+                if (data.fichiers_produits && data.fichiers_produits.length) {
+                    zoneFichiers.innerHTML = `<div class="panel"><div class="panel-title">Fichiers Produits</div>
+                        ${data.fichiers_produits.map(f => `<div style="margin-bottom:6px;"><a href="http://127.0.0.1:8000/backtesting/fichier/${data.execution_id}/${encodeURIComponent(f)}" download style="color:var(--surbrillance); text-decoration:underline; font-size:0.82rem;">⬇ ${echapperHtmlBacktesting(f)}</a></div>`).join('')}
+                    </div>`;
+                    zoneFichiers.style.display = 'block';
+                }
+
+                if (data.stats_trades) {
+                    renderDashboardBacktesting(data.stats_trades);
+                    dashboard.style.display = 'block';
+                    // La sortie texte reste consultable sans monopoliser l'ecran principal.
+                    if (data.stdout || data.stderr) {
+                        contenuSimple.innerHTML = (data.stdout ? `<div style="color:var(--silver-bright);">${echapperHtmlBacktesting(data.stdout)}</div>` : '')
+                            + (data.stderr ? `<div style="color:var(--danger); margin-top:${data.stdout ? '14px' : '0'};">${echapperHtmlBacktesting(data.stderr)}</div>` : '');
+                        document.getElementById('btZoneSortieSimple').querySelector('.panel-title').textContent = 'Sortie du Script (texte)';
+                        zoneSimple.style.display = 'block';
+                    }
+                } else {
+                    let html = '';
+                    if (data.stdout) html += `<div style="color:var(--silver-bright);">${echapperHtmlBacktesting(data.stdout)}</div>`;
+                    if (data.stderr) html += `<div style="color:var(--danger); margin-top:${data.stdout ? '14px' : '0'};">${echapperHtmlBacktesting(data.stderr)}</div>`;
+                    if (!data.stdout && !data.stderr) html = '<div style="color:var(--text-muted);">Le script s\u2019est terminé sans rien afficher.</div>';
+                    contenuSimple.innerHTML = html;
+                    zoneSimple.style.display = 'block';
+                }
+            } catch (err) {
+                etat.textContent = 'Erreur réseau';
+                etat.style.color = 'var(--danger)';
+                contenuSimple.textContent = "Impossible de contacter XTRUNN pour exécuter le script.";
+                zoneSimple.style.display = 'block';
+            } finally {
+                bouton.disabled = false;
+                bouton.textContent = 'Lancer';
+            }
+        }
+
+        function renderDashboardBacktesting(s) {
+            const devise = (typeof deviseSymbole !== 'undefined') ? deviseSymbole : '$';
+            const profitEl = document.getElementById('btKpiProfitNet');
+            profitEl.textContent = `${s.profit_net >= 0 ? '+' : ''}${s.profit_net.toFixed(2)} ${devise}`;
+            profitEl.className = 'mc-info-val ' + (s.profit_net >= 0 ? 'positive' : 'negative');
+
+            document.getElementById('btKpiPF').textContent = s.profit_factor === null ? '∞' : s.profit_factor;
+            document.getElementById('btKpiTauxGain').textContent = `${s.taux_gain_pct}%`;
+            document.getElementById('btKpiDD').textContent = `${s.max_drawdown_pct}% (${s.max_drawdown_dollars.toFixed(2)} ${devise})`;
+            document.getElementById('btKpiNTrades').textContent = s.n_trades;
+            document.getElementById('btKpiTradeMoyen').textContent = `${s.trade_moyen >= 0 ? '+' : ''}${s.trade_moyen.toFixed(2)} ${devise}`;
+            document.getElementById('btKpiPlusGrandGagnant').textContent = `+${s.plus_grand_gagnant.toFixed(2)} ${devise}`;
+            document.getElementById('btKpiPlusGrandPerdant').textContent = `${s.plus_grand_perdant.toFixed(2)} ${devise}`;
+            document.getElementById('btKpiGagnants').textContent = s.n_gagnants;
+            document.getElementById('btKpiPerdants').textContent = s.n_perdants;
+            document.getElementById('btKpiMaxGagnantsConsec').textContent = s.max_gagnants_consecutifs;
+            document.getElementById('btKpiMaxPerdantsConsec').textContent = s.max_perdants_consecutifs;
+
+            const pts = s.courbe || [];
+            const courbeBox = document.getElementById('btCourbe');
+            if (pts.length < 2) {
+                courbeBox.innerHTML = '<p style="font-size:0.8rem; color:var(--text-muted);">Pas assez de trades pour tracer une courbe.</p>';
+                return;
+            }
+            const W = 900, H = 220, P = 10;
+            const mn = Math.min(...pts, s.capital_initial), mx = Math.max(...pts, s.capital_initial);
+            const span = (mx - mn) || 1;
+            const px = (i) => P + i / (pts.length - 1) * (W - 2 * P);
+            const py = (v) => H - P - (v - mn) / span * (H - 2 * P);
+            const poly = pts.map((v, i) => `${px(i).toFixed(1)},${py(v).toFixed(1)}`).join(' ');
+            const yBase = py(s.capital_initial).toFixed(1);
+            const couleurCourbe = pts[pts.length - 1] >= s.capital_initial ? 'var(--success)' : 'var(--danger)';
+            courbeBox.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;"><line x1="${P}" x2="${W - P}" y1="${yBase}" y2="${yBase}" style="stroke:var(--ash-bright); stroke-dasharray:4 4;"></line><polyline points="${poly}" style="fill:none; stroke:${couleurCourbe}; stroke-width:2; stroke-linejoin:round;"></polyline></svg>`;
+        }
+
         function ouvrirParametres() {
             allerVersListeParametres();
             document.getElementById('drawerParametres').classList.add('ouvert');
@@ -7880,7 +8818,6 @@
                 rendreNuancesTrouNoirValidation();
                 rendreNuancesAccent();
                 rendreNuancesRail();
-                rendreNuancesRailValidation();
                 rendreNuancesEntete();
             } else if (categorie === 'devise') {
                 document.getElementById('parametresTitreActuel').textContent = 'Devise';
@@ -7960,12 +8897,6 @@
             appliquerPositionSelecteur();
         }
 
-        // N'affiche l'un ou l'autre sélecteur que si on est bien sur
-        // l'écran d'accueil -- jamais pendant la consultation d'une
-        // analyse ou le suivi d'une épreuve.
-        // Mode Validation masqué pour la v1 -- pas encore passé par le
-        // même audit et la même refonte que le mode Analyse. À réactiver
-        // une fois qu'il aura reçu le même niveau de travail.
         // N'affiche l'un ou l'autre sélecteur que si on est bien sur
         // l'écran d'accueil -- jamais pendant la consultation d'une
         // analyse ou le suivi d'une épreuve.
@@ -8324,13 +9255,14 @@
             document.getElementById('approachScreen').style.display = 'block';
             document.getElementById('insideScreen').style.display = 'none';
             document.getElementById('epreuveScreen').style.display = 'none';
+            document.getElementById('backtestingScreen').style.display = 'none';
             document.getElementById('railNav').style.display = 'none';
             document.getElementById('railToggle').style.display = 'none';
             document.getElementById('epreuveRailNav').style.display = 'none';
             document.getElementById('backToApproach').style.display = 'none';
             document.getElementById('orbitScoresGroupe').style.display = 'none';
             document.getElementById('approachScreen').classList.remove('aspire');
-            document.body.classList.remove('etat-inside', 'etat-epreuve');
+            document.body.classList.remove('etat-inside', 'etat-epreuve', 'etat-backtesting');
             document.body.classList.add('etat-approach');
 
             // Le sélecteur de mode vit désormais HORS de #approachScreen
@@ -8359,12 +9291,13 @@
             document.getElementById('approachScreen').style.display = 'none';
             document.getElementById('insideScreen').style.display = 'block';
             document.getElementById('epreuveScreen').style.display = 'none';
+            document.getElementById('backtestingScreen').style.display = 'none';
             document.getElementById('railNav').style.display = 'flex';
             document.getElementById('railToggle').style.display = 'flex';
             document.getElementById('epreuveRailNav').style.display = 'none';
             document.getElementById('backToApproach').style.display = 'flex';
             masquerSelecteurs();
-            document.body.classList.remove('etat-approach', 'etat-epreuve');
+            document.body.classList.remove('etat-approach', 'etat-epreuve', 'etat-backtesting');
             document.body.classList.add('etat-inside');
         }
 
@@ -8372,13 +9305,14 @@
             document.getElementById('approachScreen').style.display = 'none';
             document.getElementById('insideScreen').style.display = 'none';
             document.getElementById('epreuveScreen').style.display = 'block';
+            document.getElementById('backtestingScreen').style.display = 'none';
             document.getElementById('railNav').style.display = 'none';
             document.getElementById('railToggle').style.display = 'none';
             document.getElementById('epreuveRailNav').style.display = 'flex';
             document.getElementById('backToApproach').style.display = 'flex';
             document.getElementById('orbitScoresGroupe').style.display = 'none';
             masquerSelecteurs();
-            document.body.classList.remove('etat-approach', 'etat-inside');
+            document.body.classList.remove('etat-approach', 'etat-inside', 'etat-backtesting');
             document.body.classList.add('etat-epreuve');
 
             // Toujours revenir sur l'onglet Suivi en entrant sur un
@@ -8410,6 +9344,7 @@
         function retournerVersApproche() {
             afficherApproche();
             chargerStrategies();
+            chargerParcoursValidationOfficielle();
             const trou = document.getElementById('ambientBlackHole');
             trou.classList.remove('bh-hidden', 'bh-consuming');
             trou.classList.add('bh-ambient');
@@ -8818,6 +9753,7 @@ Score Combiné (repère secondaire, moyenne géométrique des scores disponibles
             const recoRisqueHtml = formaterWarningsHtml(parDiagPdf('risque', 'recommandation'));
             const qualiteD = derniereAnalyse.qualite_performance;
             const risqueD = derniereAnalyse.risque;
+
 
             // Capture des graphiques déjà rendus en images (canvas -> PNG base64)
             const equityImg = unifiedChartInstance ? unifiedChartInstance.toBase64Image() : null;
