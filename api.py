@@ -4877,6 +4877,92 @@ async def supprimer_note(note_id: int):
 # ============================================================
 BACKTESTING_DIR = os.path.join(APPDATA_DIR, "backtesting")
 BACKTESTING_TIMEOUT_SECONDES = 60
+BACKTESTING_CAPITAL_DEFAUT = 10000
+
+
+def calculer_stats_trades_backtesting(trades, capital_initial):
+    """
+    Statistiques façon "Statistiques des trades" de cTrader, calculées à
+    partir d'une simple liste de trades (date, profit) -- convention :
+    le script produit un fichier trades.csv, XTRUNN se charge de tout le
+    reste. Jamais au script de recalculer lui-même un Profit Factor ou
+    un drawdown -- une seule implémentation, réutilisée partout.
+    """
+    if not trades:
+        return None
+
+    trades_tries = sorted(trades, key=lambda t: t["date"])
+    profits = [float(t["profit"]) for t in trades_tries]
+
+    profit_net = sum(profits)
+    gains = [p for p in profits if p > 0]
+    pertes = [p for p in profits if p < 0]
+    gain_brut = sum(gains)
+    perte_brute = abs(sum(pertes))
+    profit_factor = (gain_brut / perte_brute) if perte_brute > 0 else (None if gain_brut == 0 else float("inf"))
+
+    n_trades = len(profits)
+    n_gagnants = len(gains)
+    n_perdants = len(pertes)
+    taux_gain_pct = (n_gagnants / n_trades * 100) if n_trades > 0 else 0.0
+
+    plus_grand_gagnant = max(gains) if gains else 0.0
+    plus_grand_perdant = min(pertes) if pertes else 0.0
+
+    max_gagnants_consecutifs = max_perdants_consecutifs = 0
+    serie_gagnants = serie_perdants = 0
+    for p in profits:
+        if p > 0:
+            serie_gagnants += 1
+            serie_perdants = 0
+        elif p < 0:
+            serie_perdants += 1
+            serie_gagnants = 0
+        else:
+            serie_gagnants = serie_perdants = 0
+        max_gagnants_consecutifs = max(max_gagnants_consecutifs, serie_gagnants)
+        max_perdants_consecutifs = max(max_perdants_consecutifs, serie_perdants)
+
+    trade_moyen = profit_net / n_trades if n_trades > 0 else 0.0
+
+    courbe = [capital_initial]
+    cumul = capital_initial
+    for p in profits:
+        cumul += p
+        courbe.append(cumul)
+
+    pic = capital_initial
+    max_dd_pct = 0.0
+    max_dd_dollars = 0.0
+    for v in courbe:
+        pic = max(pic, v)
+        dd_dollars = pic - v
+        dd_pct = (dd_dollars / pic * 100) if pic > 0 else 0.0
+        if dd_pct > max_dd_pct:
+            max_dd_pct = dd_pct
+            max_dd_dollars = dd_dollars
+
+    pf_arrondi = round(profit_factor, 2) if profit_factor is not None and profit_factor != float("inf") else None
+
+    return {
+        "profit_net": round(profit_net, 2),
+        "profit_factor": pf_arrondi,
+        "n_trades": n_trades,
+        "n_gagnants": n_gagnants,
+        "n_perdants": n_perdants,
+        "taux_gain_pct": round(taux_gain_pct, 1),
+        "plus_grand_gagnant": round(plus_grand_gagnant, 2),
+        "plus_grand_perdant": round(plus_grand_perdant, 2),
+        "max_gagnants_consecutifs": max_gagnants_consecutifs,
+        "max_perdants_consecutifs": max_perdants_consecutifs,
+        "trade_moyen": round(trade_moyen, 2),
+        "max_drawdown_pct": round(max_dd_pct, 2),
+        "max_drawdown_dollars": round(max_dd_dollars, 2),
+        "capital_initial": capital_initial,
+        "solde_final": round(courbe[-1], 2),
+        "courbe": [round(v, 2) for v in courbe],
+        "dates": [None] + [t["date"] for t in trades_tries],
+    }
 
 
 def _id_execution_valide(execution_id):
@@ -4890,7 +4976,7 @@ def _id_execution_valide(execution_id):
 
 
 @app.post("/backtesting/executer")
-async def executer_script_backtesting(script: str = Form(...), fichier_donnees: UploadFile = File(None)):
+async def executer_script_backtesting(script: str = Form(...), fichier_donnees: UploadFile = File(None), capital_initial: float = Form(BACKTESTING_CAPITAL_DEFAUT)):
     os.makedirs(BACKTESTING_DIR, exist_ok=True)
     execution_id = str(uuid.uuid4())
     dossier_exec = os.path.join(BACKTESTING_DIR, execution_id)
@@ -4928,6 +5014,27 @@ async def executer_script_backtesting(script: str = Form(...), fichier_donnees: 
     fichiers_apres = set(os.listdir(dossier_exec))
     fichiers_produits = sorted(fichiers_apres - fichiers_avant - {"script.py"})
 
+    # Convention : si le script produit un fichier nommé exactement
+    # trades.csv (colonnes date, profit -- symbole et notes optionnels),
+    # XTRUNN calcule lui-même toutes les statistiques, façon cTrader.
+    # Jamais au script de recalculer un Profit Factor ou un drawdown --
+    # une seule implémentation, celle déjà utilisée partout ailleurs.
+    stats_trades = None
+    if "trades.csv" in fichiers_produits:
+        try:
+            df_trades = pd.read_csv(os.path.join(dossier_exec, "trades.csv"))
+            df_trades.columns = [c.strip().lower() for c in df_trades.columns]
+            if "date" in df_trades.columns and "profit" in df_trades.columns:
+                trades_liste = [
+                    {"date": str(r["date"]), "profit": float(r["profit"])}
+                    for _, r in df_trades.iterrows()
+                ]
+                stats_trades = calculer_stats_trades_backtesting(trades_liste, capital_initial)
+            else:
+                stderr += "\n\n--- trades.csv produit, mais colonnes 'date' et 'profit' introuvables -- statistiques non calculées ---"
+        except Exception as e:
+            stderr += f"\n\n--- trades.csv produit, mais impossible à lire ({e}) -- statistiques non calculées ---"
+
     # Tronqué pour éviter qu'un script trop bavard (ex. un print dans une
     # boucle) ne fasse exploser la taille de la réponse.
     LIMITE_CARACTERES = 50_000
@@ -4942,6 +5049,7 @@ async def executer_script_backtesting(script: str = Form(...), fichier_donnees: 
         "stderr": stderr,
         "code_retour": code_retour,
         "timed_out": timed_out,
+        "stats_trades": stats_trades,
         "fichiers_produits": fichiers_produits,
     }
 
