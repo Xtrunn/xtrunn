@@ -1861,6 +1861,7 @@
     <div class="mode-switcher-classique" id="modeSwitcherClassique" style="display:none;">
         <button type="button" class="mode-switcher-classique-btn active" data-mode="analyse" onclick="basculerModeAccueil('analyse')">Analyse</button>
         <button type="button" class="mode-switcher-classique-btn" data-mode="validation_officielle" onclick="basculerModeAccueil('validation_officielle')">Suivi</button>
+        <button type="button" class="mode-switcher-classique-btn" data-mode="backtesting" onclick="basculerModeAccueil('backtesting')">Backtesting</button>
     </div>
 
     <div class="mode-switcher" id="modeSwitcher">
@@ -1874,6 +1875,10 @@
         <div class="mode-node-target" id="modeNodeValidationOfficielle" style="left:53.10px; top:299.30px;" onclick="basculerModeAccueil('validation_officielle')" title="Suivi">
             <span class="mode-node-icon mode-icon-validation"><svg viewBox="3.3 1.23 18.62 26.15" width="20" height="28" fill="currentColor"><path d="M12.33 2.73L10.73 3.76L8.56 3.76L7.72 5.46L7.25 5.84L6.21 6.21L5.84 6.59L5.84 8.66L4.8 10.26L4.8 10.73L5.84 12.33L5.74 14.21L5.93 14.59L7.62 15.44L8.56 17.22L8.94 17.41L10.64 17.22L11.11 17.41L12.24 18.26L12.99 18.26L14.12 17.41L14.59 17.22L16.38 17.41L16.85 17.04L17.22 16.0L17.79 15.34L19.39 14.49L19.39 12.42L19.67 11.76L20.42 10.82L20.42 10.16L19.67 9.22L19.39 8.56L19.39 6.49L17.69 5.65L17.22 4.99L16.66 3.76L14.49 3.76L14.31 3.58L14.02 3.58L12.89 2.73Z"/><path d="M7.81 17.22L5.46 24.19L8.09 22.96L8.66 22.87L9.13 23.25L10.54 25.88L12.89 19.01L12.33 19.01L10.82 17.98L8.56 17.98Z"/><path d="M17.51 17.32L17.32 17.32L16.66 17.98L14.4 17.98L13.65 18.64L12.99 20.61L12.99 20.99L14.68 25.88L16.38 22.96L16.94 22.87L19.76 24.19Z"/><path d="M16.19 8.85L15.53 8.19L15.34 8.19L11.67 11.86L11.39 11.86L9.88 10.35L9.69 10.35L9.13 11.11L11.58 13.55Z" fill="#00000070"/></svg></span>
             <span class="mode-node-label">Suivi</span>
+        </div>
+        <div class="mode-node-target" id="modeNodeBacktesting" style="left:34.10px; top:220.00px;" onclick="basculerModeAccueil('backtesting')" title="Backtesting">
+            <span class="mode-node-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg></span>
+            <span class="mode-node-label">Backtesting</span>
         </div>
         <div class="mode-node-handle" id="modeNodeHandle" style="left:53.10px; top:140.70px;" onpointerdown="demarrerDragOrbite(event)"></div>
     </div>
@@ -2040,6 +2045,70 @@
                 <div id="voVerdictContenu"></div>
             </div>
         </div>
+
+        <div id="modeBacktestingContent" class="mode-content" style="display:none;">
+        <div class="panel">
+            <div class="panel-title">Backtesting</div>
+            <p style="font-size:0.8rem; color:var(--text-muted); line-height:1.6; margin-bottom:16px;">
+                Dépose un fichier de données, colle un script Python (écrit par ton IA par exemple), lance-le.
+                Si le script produit un fichier <strong>trades.csv</strong> (colonnes <strong>date, profit</strong>),
+                XTRUNN calcule lui-même toutes les statistiques ci-dessous -- le script n'a qu'à produire la liste des trades,
+                jamais à recalculer un Profit Factor ou un drawdown lui-même.
+            </p>
+            <div style="display:flex; gap:14px; align-items:flex-end; flex-wrap:wrap; margin-bottom:14px;">
+                <div class="input-group" style="flex:1; min-width:200px; margin-bottom:0;">
+                    <label>Fichier de données <span style="text-transform:none; letter-spacing:0; opacity:0.7;">(optionnel)</span></label>
+                    <input type="file" id="btFichierDonnees">
+                </div>
+                <div class="input-group" style="flex:0 0 150px; margin-bottom:0;">
+                    <label>Capital initial</label>
+                    <input type="number" id="btCapitalInitial" value="10000">
+                </div>
+                <button class="btn-analyser" style="flex:0 0 auto; padding:12px 26px;" id="btBoutonLancer" onclick="lancerScriptBacktesting()">Lancer</button>
+            </div>
+            <textarea id="btScriptTextarea" placeholder="Colle ici le script Python que ton IA t'a écrit...
+
+Le fichier déposé ci-dessus est accessible depuis le script par son nom de fichier (ex. pd.read_csv('mon_fichier.csv')).
+Pour obtenir le tableau de statistiques complet, le script doit produire un fichier trades.csv avec les colonnes date et profit.
+Tout autre fichier produit (ex. df.to_csv('autre.csv')) sera aussi proposé au téléchargement." style="width:100%; height:200px; resize:vertical; box-sizing:border-box; border:1px solid var(--ash); border-radius:8px; outline:none; background:var(--void-3); color:var(--silver-bright); font-family:'Consolas','Monaco',monospace; font-size:0.8rem; line-height:1.6; padding:14px;"></textarea>
+            <div id="btEtatExecution" style="margin-top:10px; font-size:0.82rem;"></div>
+        </div>
+
+        <div id="btZoneSortieSimple" class="panel" style="display:none;">
+            <div class="panel-title">Sortie du Script</div>
+            <div id="btContenuSortieSimple" style="font-family:'Consolas','Monaco',monospace; font-size:0.78rem; line-height:1.7; white-space:pre-wrap;"></div>
+        </div>
+
+        <div id="btZoneFichiers" style="display:none; margin-bottom:20px;"></div>
+
+        <div id="btDashboard" style="display:none;">
+            <div class="panel">
+                <div class="panel-title">Statistiques des Trades</div>
+                <div class="metric-row-4">
+                    <div class="mc-info-card"><div class="mc-info-title">Profit Net</div><div class="mc-info-val" id="btKpiProfitNet">--</div></div>
+                    <div class="mc-info-card"><div class="mc-info-title">Profit Factor</div><div class="mc-info-val" id="btKpiPF">--</div></div>
+                    <div class="mc-info-card"><div class="mc-info-title">Taux de Gain</div><div class="mc-info-val" id="btKpiTauxGain">--</div></div>
+                    <div class="mc-info-card"><div class="mc-info-title">Max Drawdown</div><div class="mc-info-val" id="btKpiDD">--</div></div>
+                </div>
+                <div class="metric-row-4" style="margin-top:10px;">
+                    <div class="mc-info-card"><div class="mc-info-title">Total Trades</div><div class="mc-info-val" id="btKpiNTrades">--</div></div>
+                    <div class="mc-info-card"><div class="mc-info-title">Trade Moyen</div><div class="mc-info-val" id="btKpiTradeMoyen">--</div></div>
+                    <div class="mc-info-card"><div class="mc-info-title">Plus Grand Gagnant</div><div class="mc-info-val" id="btKpiPlusGrandGagnant">--</div></div>
+                    <div class="mc-info-card"><div class="mc-info-title">Plus Grand Perdant</div><div class="mc-info-val" id="btKpiPlusGrandPerdant">--</div></div>
+                </div>
+                <div class="metric-row-4" style="margin-top:10px;">
+                    <div class="mc-info-card"><div class="mc-info-title">Trades Gagnants</div><div class="mc-info-val" id="btKpiGagnants">--</div></div>
+                    <div class="mc-info-card"><div class="mc-info-title">Trades Perdants</div><div class="mc-info-val" id="btKpiPerdants">--</div></div>
+                    <div class="mc-info-card"><div class="mc-info-title">Max Gains Consécutifs</div><div class="mc-info-val" id="btKpiMaxGagnantsConsec">--</div></div>
+                    <div class="mc-info-card"><div class="mc-info-title">Max Pertes Consécutives</div><div class="mc-info-val" id="btKpiMaxPerdantsConsec">--</div></div>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-title">Courbe de Capital</div>
+                <div id="btCourbe"></div>
+            </div>
+        </div>
+    </div>
     </div>
 
     <div class="back-to-approach" id="backToApproach" onclick="retournerVersApproche()" style="display:none;">‹ <span class="back-to-approach-label">Retour à l'accueil</span></div>
@@ -3240,69 +3309,7 @@
         </div>
     </div>
 
-    <div id="backtestingScreen" style="display:none; max-width:1200px; margin:0 auto; padding:30px 24px 60px;">
-        <div class="panel">
-            <div class="panel-title">Backtesting</div>
-            <p style="font-size:0.8rem; color:var(--text-muted); line-height:1.6; margin-bottom:16px;">
-                Dépose un fichier de données, colle un script Python (écrit par ton IA par exemple), lance-le.
-                Si le script produit un fichier <strong>trades.csv</strong> (colonnes <strong>date, profit</strong>),
-                XTRUNN calcule lui-même toutes les statistiques ci-dessous -- le script n'a qu'à produire la liste des trades,
-                jamais à recalculer un Profit Factor ou un drawdown lui-même.
-            </p>
-            <div style="display:flex; gap:14px; align-items:flex-end; flex-wrap:wrap; margin-bottom:14px;">
-                <div class="input-group" style="flex:1; min-width:200px; margin-bottom:0;">
-                    <label>Fichier de données <span style="text-transform:none; letter-spacing:0; opacity:0.7;">(optionnel)</span></label>
-                    <input type="file" id="btFichierDonnees">
-                </div>
-                <div class="input-group" style="flex:0 0 150px; margin-bottom:0;">
-                    <label>Capital initial</label>
-                    <input type="number" id="btCapitalInitial" value="10000">
-                </div>
-                <button class="btn-analyser" style="flex:0 0 auto; padding:12px 26px;" id="btBoutonLancer" onclick="lancerScriptBacktesting()">Lancer</button>
-            </div>
-            <textarea id="btScriptTextarea" placeholder="Colle ici le script Python que ton IA t'a écrit...
-
-Le fichier déposé ci-dessus est accessible depuis le script par son nom de fichier (ex. pd.read_csv('mon_fichier.csv')).
-Pour obtenir le tableau de statistiques complet, le script doit produire un fichier trades.csv avec les colonnes date et profit.
-Tout autre fichier produit (ex. df.to_csv('autre.csv')) sera aussi proposé au téléchargement." style="width:100%; height:200px; resize:vertical; box-sizing:border-box; border:1px solid var(--ash); border-radius:8px; outline:none; background:var(--void-3); color:var(--silver-bright); font-family:'Consolas','Monaco',monospace; font-size:0.8rem; line-height:1.6; padding:14px;"></textarea>
-            <div id="btEtatExecution" style="margin-top:10px; font-size:0.82rem;"></div>
-        </div>
-
-        <div id="btZoneSortieSimple" class="panel" style="display:none;">
-            <div class="panel-title">Sortie du Script</div>
-            <div id="btContenuSortieSimple" style="font-family:'Consolas','Monaco',monospace; font-size:0.78rem; line-height:1.7; white-space:pre-wrap;"></div>
-        </div>
-
-        <div id="btZoneFichiers" style="display:none; margin-bottom:20px;"></div>
-
-        <div id="btDashboard" style="display:none;">
-            <div class="panel">
-                <div class="panel-title">Statistiques des Trades</div>
-                <div class="metric-row-4">
-                    <div class="mc-info-card"><div class="mc-info-title">Profit Net</div><div class="mc-info-val" id="btKpiProfitNet">--</div></div>
-                    <div class="mc-info-card"><div class="mc-info-title">Profit Factor</div><div class="mc-info-val" id="btKpiPF">--</div></div>
-                    <div class="mc-info-card"><div class="mc-info-title">Taux de Gain</div><div class="mc-info-val" id="btKpiTauxGain">--</div></div>
-                    <div class="mc-info-card"><div class="mc-info-title">Max Drawdown</div><div class="mc-info-val" id="btKpiDD">--</div></div>
-                </div>
-                <div class="metric-row-4" style="margin-top:10px;">
-                    <div class="mc-info-card"><div class="mc-info-title">Total Trades</div><div class="mc-info-val" id="btKpiNTrades">--</div></div>
-                    <div class="mc-info-card"><div class="mc-info-title">Trade Moyen</div><div class="mc-info-val" id="btKpiTradeMoyen">--</div></div>
-                    <div class="mc-info-card"><div class="mc-info-title">Plus Grand Gagnant</div><div class="mc-info-val" id="btKpiPlusGrandGagnant">--</div></div>
-                    <div class="mc-info-card"><div class="mc-info-title">Plus Grand Perdant</div><div class="mc-info-val" id="btKpiPlusGrandPerdant">--</div></div>
-                </div>
-                <div class="metric-row-4" style="margin-top:10px;">
-                    <div class="mc-info-card"><div class="mc-info-title">Trades Gagnants</div><div class="mc-info-val" id="btKpiGagnants">--</div></div>
-                    <div class="mc-info-card"><div class="mc-info-title">Trades Perdants</div><div class="mc-info-val" id="btKpiPerdants">--</div></div>
-                    <div class="mc-info-card"><div class="mc-info-title">Max Gains Consécutifs</div><div class="mc-info-val" id="btKpiMaxGagnantsConsec">--</div></div>
-                    <div class="mc-info-card"><div class="mc-info-title">Max Pertes Consécutives</div><div class="mc-info-val" id="btKpiMaxPerdantsConsec">--</div></div>
-                </div>
-            </div>
-            <div class="panel">
-                <div class="panel-title">Courbe de Capital</div>
-                <div id="btCourbe"></div>
-            </div>
-        </div>
-    </div>
+    
 
     </div>
     </div>
@@ -7790,11 +7797,17 @@ Tout autre fichier produit (ex. df.to_csv('autre.csv')) sera aussi proposé au t
         const ORBIT_RADIUS = 174.99;
         const ORBIT_THETA_ANALYSE_BASE = 206.948 * Math.PI / 180;
         const ORBIT_THETA_VALIDATION_OFFICIELLE_BASE = 153.052 * Math.PI / 180;
+        // Exactement la moyenne des deux angles ci-dessus (206.948 +
+        // 153.052) / 2 = 180° -- le vrai milieu mathématique de l'arc,
+        // qui tombe pile sur le centre du trou noir. Le troisième nœud
+        // vit sur ce même arc, entre les deux autres, pas à côté.
+        const ORBIT_THETA_BACKTESTING_BASE = 180 * Math.PI / 180;
         // Décalés ensemble par la rotation choisie dans les Paramètres --
-        // ce sont ces deux-là que le reste du code (glissement, affichage)
+        // ce sont ceux-là que le reste du code (glissement, affichage)
         // utilise réellement, jamais les valeurs de base directement.
         let ORBIT_THETA_ANALYSE = ORBIT_THETA_ANALYSE_BASE;
         let ORBIT_THETA_VALIDATION_OFFICIELLE = ORBIT_THETA_VALIDATION_OFFICIELLE_BASE;
+        let ORBIT_THETA_BACKTESTING = ORBIT_THETA_BACKTESTING_BASE;
         let dragOrbiteEnCours = false;
         let animOrbiteFrame = null;
 
@@ -8642,22 +8655,13 @@ Tout autre fichier produit (ex. df.to_csv('autre.csv')) sera aussi proposé au t
         // avec delai limite -- voir /backtesting/executer dans api.py.
         // ============================================================
         function ouvrirPanneauBacktesting() {
-            document.getElementById('approachScreen').style.display = 'none';
-            document.getElementById('insideScreen').style.display = 'none';
-            document.getElementById('epreuveScreen').style.display = 'none';
-            document.getElementById('backtestingScreen').style.display = 'block';
-            document.getElementById('railNav').style.display = 'none';
-            document.getElementById('railToggle').style.display = 'none';
-            document.getElementById('epreuveRailNav').style.display = 'none';
-            document.getElementById('backToApproach').style.display = 'flex';
-            document.getElementById('orbitScoresGroupe').style.display = 'none';
-            masquerSelecteurs();
-            document.body.classList.remove('etat-approach', 'etat-inside', 'etat-epreuve');
-            document.body.classList.add('etat-backtesting');
-        }
-
-        function fermerPanneauBacktesting() {
-            retournerVersApproche();
+            // Si on n'est pas déjà sur l'écran d'accueil (ex. en train de
+            // consulter un Suivi), y revenir d'abord -- le sélecteur de
+            // mode et les trois contenus ne vivent que là.
+            if (!document.body.classList.contains('etat-approach')) {
+                afficherApproche();
+            }
+            basculerModeAccueil('backtesting');
         }
 
         function echapperHtmlBacktesting(texte) {
@@ -8935,15 +8939,21 @@ Tout autre fichier produit (ex. df.to_csv('autre.csv')) sera aussi proposé au t
             const rad = rotationSelecteur * Math.PI / 180;
             ORBIT_THETA_ANALYSE = ORBIT_THETA_ANALYSE_BASE + rad;
             ORBIT_THETA_VALIDATION_OFFICIELLE = ORBIT_THETA_VALIDATION_OFFICIELLE_BASE + rad;
+            ORBIT_THETA_BACKTESTING = ORBIT_THETA_BACKTESTING_BASE + rad;
             const posA = positionSurArc(ORBIT_THETA_ANALYSE);
             const posV = positionSurArc(ORBIT_THETA_VALIDATION_OFFICIELLE);
+            const posB = positionSurArc(ORBIT_THETA_BACKTESTING);
             const na = document.getElementById('modeNodeAnalyse');
             const nv = document.getElementById('modeNodeValidationOfficielle');
+            const nb = document.getElementById('modeNodeBacktesting');
             na.style.left = posA.x.toFixed(2) + 'px'; na.style.top = posA.y.toFixed(2) + 'px';
             nv.style.left = posV.x.toFixed(2) + 'px'; nv.style.top = posV.y.toFixed(2) + 'px';
+            nb.style.left = posB.x.toFixed(2) + 'px'; nb.style.top = posB.y.toFixed(2) + 'px';
             const svgPath = document.querySelector('.mode-switcher-arc-svg path');
             svgPath.setAttribute('d', `M ${posA.x.toFixed(2)} ${posA.y.toFixed(2)} A ${ORBIT_RADIUS} ${ORBIT_RADIUS} 0 0 0 ${posV.x.toFixed(2)} ${posV.y.toFixed(2)}`);
-            const modeActif = na.classList.contains('active') ? 'analyse' : 'validation_officielle';
+            const modeActif = na.classList.contains('active') ? 'analyse'
+                : nb.classList.contains('active') ? 'backtesting'
+                : 'validation_officielle';
             placerHandleSurArc(modeActif, false);
         }
 
@@ -9054,6 +9064,7 @@ Tout autre fichier produit (ex. df.to_csv('autre.csv')) sera aussi proposé au t
             const handle = document.getElementById('modeNodeHandle');
             if (!handle) return;
             const thetaCible = mode === 'validation_officielle' ? ORBIT_THETA_VALIDATION_OFFICIELLE
+                : mode === 'backtesting' ? ORBIT_THETA_BACKTESTING
                 : ORBIT_THETA_ANALYSE;
 
             if (animOrbiteFrame) { cancelAnimationFrame(animOrbiteFrame); animOrbiteFrame = null; }
@@ -9125,10 +9136,12 @@ Tout autre fichier produit (ex. df.to_csv('autre.csv')) sera aussi proposé au t
             handle.dataset.theta = theta;
 
             // Retour visuel en direct pendant le geste : le label le plus
-            // proche s'illumine avant même de relâcher.
-            const modeLePlusProche = t < 0.5 ? 'analyse' : 'validation_officielle';
+            // proche s'illumine avant même de relâcher -- vraie distance
+            // angulaire aux trois nœuds, pas une simple coupure en deux.
+            const modeLePlusProche = trouverModeLePlusProche(theta);
             document.getElementById('modeNodeAnalyse').querySelector('.mode-node-label').classList.toggle('active-label', modeLePlusProche === 'analyse');
             document.getElementById('modeNodeValidationOfficielle').querySelector('.mode-node-label').classList.toggle('active-label', modeLePlusProche === 'validation_officielle');
+            document.getElementById('modeNodeBacktesting').querySelector('.mode-node-label').classList.toggle('active-label', modeLePlusProche === 'backtesting');
         }
 
         // Le mode dont l'angle nommé est le plus proche de theta -- point
@@ -9140,6 +9153,7 @@ Tout autre fichier produit (ex. df.to_csv('autre.csv')) sera aussi proposé au t
             const distances = {
                 analyse: Math.abs(differenceAngle(theta, ORBIT_THETA_ANALYSE)),
                 validation_officielle: Math.abs(differenceAngle(theta, ORBIT_THETA_VALIDATION_OFFICIELLE)),
+                backtesting: Math.abs(differenceAngle(theta, ORBIT_THETA_BACKTESTING)),
             };
             return Object.keys(distances).reduce((a, b) => distances[a] <= distances[b] ? a : b);
         }
@@ -9163,6 +9177,7 @@ Tout autre fichier produit (ex. df.to_csv('autre.csv')) sera aussi proposé au t
             const contenus = {
                 analyse: document.getElementById('modeAnalyseContent'),
                 validation_officielle: document.getElementById('modeValidationOfficielleContent'),
+                backtesting: document.getElementById('modeBacktestingContent'),
             };
             // Le mode "actuel" se déduit de quel contenu est visible --
             // pas de variable d'état séparée à garder synchronisée.
@@ -9198,6 +9213,7 @@ Tout autre fichier produit (ex. df.to_csv('autre.csv')) sera aussi proposé au t
                 const nodes = {
                     analyse: document.getElementById('modeNodeAnalyse'),
                     validation_officielle: document.getElementById('modeNodeValidationOfficielle'),
+                    backtesting: document.getElementById('modeNodeBacktesting'),
                 };
                 Object.keys(nodes).forEach(m => {
                     nodes[m].classList.toggle('active', m === mode);
@@ -9255,7 +9271,6 @@ Tout autre fichier produit (ex. df.to_csv('autre.csv')) sera aussi proposé au t
             document.getElementById('approachScreen').style.display = 'block';
             document.getElementById('insideScreen').style.display = 'none';
             document.getElementById('epreuveScreen').style.display = 'none';
-            document.getElementById('backtestingScreen').style.display = 'none';
             document.getElementById('railNav').style.display = 'none';
             document.getElementById('railToggle').style.display = 'none';
             document.getElementById('epreuveRailNav').style.display = 'none';
@@ -9291,7 +9306,6 @@ Tout autre fichier produit (ex. df.to_csv('autre.csv')) sera aussi proposé au t
             document.getElementById('approachScreen').style.display = 'none';
             document.getElementById('insideScreen').style.display = 'block';
             document.getElementById('epreuveScreen').style.display = 'none';
-            document.getElementById('backtestingScreen').style.display = 'none';
             document.getElementById('railNav').style.display = 'flex';
             document.getElementById('railToggle').style.display = 'flex';
             document.getElementById('epreuveRailNav').style.display = 'none';
@@ -9305,7 +9319,6 @@ Tout autre fichier produit (ex. df.to_csv('autre.csv')) sera aussi proposé au t
             document.getElementById('approachScreen').style.display = 'none';
             document.getElementById('insideScreen').style.display = 'none';
             document.getElementById('epreuveScreen').style.display = 'block';
-            document.getElementById('backtestingScreen').style.display = 'none';
             document.getElementById('railNav').style.display = 'none';
             document.getElementById('railToggle').style.display = 'none';
             document.getElementById('epreuveRailNav').style.display = 'flex';
