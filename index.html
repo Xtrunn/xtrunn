@@ -3239,6 +3239,71 @@
             </div>
         </div>
     </div>
+
+    <div id="backtestingScreen" style="display:none; max-width:1200px; margin:0 auto; padding:30px 24px 60px;">
+        <div class="panel">
+            <div class="panel-title">Backtesting</div>
+            <p style="font-size:0.8rem; color:var(--text-muted); line-height:1.6; margin-bottom:16px;">
+                Dépose un fichier de données, colle un script Python (écrit par ton IA par exemple), lance-le.
+                Si le script produit un fichier <strong>trades.csv</strong> (colonnes <strong>date, profit</strong>),
+                XTRUNN calcule lui-même toutes les statistiques ci-dessous -- le script n'a qu'à produire la liste des trades,
+                jamais à recalculer un Profit Factor ou un drawdown lui-même.
+            </p>
+            <div style="display:flex; gap:14px; align-items:flex-end; flex-wrap:wrap; margin-bottom:14px;">
+                <div class="input-group" style="flex:1; min-width:200px; margin-bottom:0;">
+                    <label>Fichier de données <span style="text-transform:none; letter-spacing:0; opacity:0.7;">(optionnel)</span></label>
+                    <input type="file" id="btFichierDonnees">
+                </div>
+                <div class="input-group" style="flex:0 0 150px; margin-bottom:0;">
+                    <label>Capital initial</label>
+                    <input type="number" id="btCapitalInitial" value="10000">
+                </div>
+                <button class="btn-analyser" style="flex:0 0 auto; padding:12px 26px;" id="btBoutonLancer" onclick="lancerScriptBacktesting()">Lancer</button>
+            </div>
+            <textarea id="btScriptTextarea" placeholder="Colle ici le script Python que ton IA t'a écrit...
+
+Le fichier déposé ci-dessus est accessible depuis le script par son nom de fichier (ex. pd.read_csv('mon_fichier.csv')).
+Pour obtenir le tableau de statistiques complet, le script doit produire un fichier trades.csv avec les colonnes date et profit.
+Tout autre fichier produit (ex. df.to_csv('autre.csv')) sera aussi proposé au téléchargement." style="width:100%; height:200px; resize:vertical; box-sizing:border-box; border:1px solid var(--ash); border-radius:8px; outline:none; background:var(--void-3); color:var(--silver-bright); font-family:'Consolas','Monaco',monospace; font-size:0.8rem; line-height:1.6; padding:14px;"></textarea>
+            <div id="btEtatExecution" style="margin-top:10px; font-size:0.82rem;"></div>
+        </div>
+
+        <div id="btZoneSortieSimple" class="panel" style="display:none;">
+            <div class="panel-title">Sortie du Script</div>
+            <div id="btContenuSortieSimple" style="font-family:'Consolas','Monaco',monospace; font-size:0.78rem; line-height:1.7; white-space:pre-wrap;"></div>
+        </div>
+
+        <div id="btZoneFichiers" style="display:none; margin-bottom:20px;"></div>
+
+        <div id="btDashboard" style="display:none;">
+            <div class="panel">
+                <div class="panel-title">Statistiques des Trades</div>
+                <div class="metric-row-4">
+                    <div class="mc-info-card"><div class="mc-info-title">Profit Net</div><div class="mc-info-val" id="btKpiProfitNet">--</div></div>
+                    <div class="mc-info-card"><div class="mc-info-title">Profit Factor</div><div class="mc-info-val" id="btKpiPF">--</div></div>
+                    <div class="mc-info-card"><div class="mc-info-title">Taux de Gain</div><div class="mc-info-val" id="btKpiTauxGain">--</div></div>
+                    <div class="mc-info-card"><div class="mc-info-title">Max Drawdown</div><div class="mc-info-val" id="btKpiDD">--</div></div>
+                </div>
+                <div class="metric-row-4" style="margin-top:10px;">
+                    <div class="mc-info-card"><div class="mc-info-title">Total Trades</div><div class="mc-info-val" id="btKpiNTrades">--</div></div>
+                    <div class="mc-info-card"><div class="mc-info-title">Trade Moyen</div><div class="mc-info-val" id="btKpiTradeMoyen">--</div></div>
+                    <div class="mc-info-card"><div class="mc-info-title">Plus Grand Gagnant</div><div class="mc-info-val" id="btKpiPlusGrandGagnant">--</div></div>
+                    <div class="mc-info-card"><div class="mc-info-title">Plus Grand Perdant</div><div class="mc-info-val" id="btKpiPlusGrandPerdant">--</div></div>
+                </div>
+                <div class="metric-row-4" style="margin-top:10px;">
+                    <div class="mc-info-card"><div class="mc-info-title">Trades Gagnants</div><div class="mc-info-val" id="btKpiGagnants">--</div></div>
+                    <div class="mc-info-card"><div class="mc-info-title">Trades Perdants</div><div class="mc-info-val" id="btKpiPerdants">--</div></div>
+                    <div class="mc-info-card"><div class="mc-info-title">Max Gains Consécutifs</div><div class="mc-info-val" id="btKpiMaxGagnantsConsec">--</div></div>
+                    <div class="mc-info-card"><div class="mc-info-title">Max Pertes Consécutives</div><div class="mc-info-val" id="btKpiMaxPerdantsConsec">--</div></div>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-title">Courbe de Capital</div>
+                <div id="btCourbe"></div>
+            </div>
+        </div>
+    </div>
+
     </div>
     </div>
 
@@ -3672,44 +3737,7 @@
         </div>
     </div>
 
-    <div id="modalBacktesting" class="modal-overlay" style="display:none;" onclick="if(event.target===this) fermerPanneauBacktesting()">
-        <div class="modal-content" style="max-width:900px; width:94vw; padding:0; overflow:hidden;">
-            <button class="modal-close" onclick="fermerPanneauBacktesting()" style="z-index:2;">✕</button>
-            <div style="display:flex; flex-direction:column; height:min(780px, 88vh);">
-                <div style="padding:20px 24px 14px; border-bottom:1px solid var(--ash);">
-                    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:1rem; margin-bottom:4px;">Backtesting</div>
-                    <div style="font-size:0.76rem; color:var(--text-muted); line-height:1.5;">Dépose un fichier de données, colle un script Python (écrit par ton IA par exemple), lance-le. Exécuté à part, avec une limite de 60 secondes -- un script qui plante ou boucle ne touche jamais au reste de XTRUNN.</div>
-                </div>
-                <div style="padding:16px 24px; border-bottom:1px solid var(--ash); display:flex; gap:14px; align-items:flex-end; flex-wrap:wrap;">
-                    <div class="input-group" style="flex:1; min-width:220px; margin-bottom:0;">
-                        <label>Fichier de données <span style="text-transform:none; letter-spacing:0; opacity:0.7;">(optionnel)</span></label>
-                        <input type="file" id="btFichierDonnees">
-                    </div>
-                    <button class="btn-analyser" style="flex:0 0 auto; padding:12px 26px;" id="btBoutonLancer" onclick="lancerScriptBacktesting()">Lancer</button>
-                </div>
-                <div style="flex:1; display:flex; min-height:0;">
-                    <div style="flex:1; display:flex; flex-direction:column; border-right:1px solid var(--ash); min-width:0;">
-                        <div style="padding:10px 16px; font-size:0.7rem; letter-spacing:0.5px; text-transform:uppercase; color:var(--text-muted); border-bottom:1px solid var(--ash);">Script Python</div>
-                        <textarea id="btScriptTextarea" placeholder="Colle ici le script Python que ton IA t'a écrit...
-
-Le fichier déposé ci-dessus est accessible depuis le script par son nom de fichier (ex. pd.read_csv('mon_fichier.csv')).
-Tout fichier que le script écrit (ex. df.to_csv('resultat.csv')) sera proposé au téléchargement une fois l'exécution terminée." style="flex:1; resize:none; border:none; outline:none; background:none; color:var(--silver-bright); font-family:'Consolas','Monaco',monospace; font-size:0.8rem; line-height:1.6; padding:16px;"></textarea>
-                    </div>
-                    <div style="flex:1; display:flex; flex-direction:column; min-width:0;">
-                        <div style="padding:10px 16px; font-size:0.7rem; letter-spacing:0.5px; text-transform:uppercase; color:var(--text-muted); border-bottom:1px solid var(--ash); display:flex; justify-content:space-between; align-items:center;">
-                            <span>Résultat</span>
-                            <span id="btEtatExecution" style="text-transform:none; font-size:0.72rem;"></span>
-                        </div>
-                        <div id="btZoneResultat" style="flex:1; overflow-y:auto; padding:16px; font-family:'Consolas','Monaco',monospace; font-size:0.78rem; line-height:1.6; color:var(--text-muted);">
-                            En attente d'une première exécution.
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script>
+<script>
         // Couleurs de graphique adaptées au thème -- les grilles et
         // lignes neutres étaient codées en blanc translucide, invisibles
         // une fois passé en mode clair.
@@ -8614,11 +8642,22 @@ Tout fichier que le script écrit (ex. df.to_csv('resultat.csv')) sera proposé 
         // avec delai limite -- voir /backtesting/executer dans api.py.
         // ============================================================
         function ouvrirPanneauBacktesting() {
-            ouvrirModaleAnimee('modalBacktesting');
+            document.getElementById('approachScreen').style.display = 'none';
+            document.getElementById('insideScreen').style.display = 'none';
+            document.getElementById('epreuveScreen').style.display = 'none';
+            document.getElementById('backtestingScreen').style.display = 'block';
+            document.getElementById('railNav').style.display = 'none';
+            document.getElementById('railToggle').style.display = 'none';
+            document.getElementById('epreuveRailNav').style.display = 'none';
+            document.getElementById('backToApproach').style.display = 'flex';
+            document.getElementById('orbitScoresGroupe').style.display = 'none';
+            masquerSelecteurs();
+            document.body.classList.remove('etat-approach', 'etat-inside', 'etat-epreuve');
+            document.body.classList.add('etat-backtesting');
         }
 
         function fermerPanneauBacktesting() {
-            fermerModaleAnimee('modalBacktesting');
+            retournerVersApproche();
         }
 
         function echapperHtmlBacktesting(texte) {
@@ -8628,9 +8667,12 @@ Tout fichier que le script écrit (ex. df.to_csv('resultat.csv')) sera proposé 
 
         async function lancerScriptBacktesting() {
             const script = document.getElementById('btScriptTextarea').value;
-            const zone = document.getElementById('btZoneResultat');
             const etat = document.getElementById('btEtatExecution');
             const bouton = document.getElementById('btBoutonLancer');
+            const zoneSimple = document.getElementById('btZoneSortieSimple');
+            const contenuSimple = document.getElementById('btContenuSortieSimple');
+            const zoneFichiers = document.getElementById('btZoneFichiers');
+            const dashboard = document.getElementById('btDashboard');
 
             if (!script.trim()) {
                 alert("Colle d'abord un script à exécuter.");
@@ -8641,20 +8683,22 @@ Tout fichier que le script écrit (ex. df.to_csv('resultat.csv')) sera proposé 
             bouton.textContent = 'En cours...';
             etat.textContent = 'Exécution en cours (jusqu\u2019à 60s)...';
             etat.style.color = 'var(--text-muted)';
-            zone.textContent = '';
+            zoneSimple.style.display = 'none';
+            zoneFichiers.style.display = 'none';
+            dashboard.style.display = 'none';
 
             try {
                 const formData = new FormData();
                 formData.append('script', script);
+                formData.append('capital_initial', document.getElementById('btCapitalInitial').value || 10000);
                 const fichier = document.getElementById('btFichierDonnees').files[0];
                 if (fichier) formData.append('fichier_donnees', fichier);
 
                 const resp = await fetch('http://127.0.0.1:8000/backtesting/executer', { method: 'POST', body: formData });
                 const data = await resp.json();
 
-                let html = '';
                 if (data.timed_out) {
-                    etat.textContent = 'Arrêté (délai dépassé)';
+                    etat.textContent = 'Arrêté (délai dépassé -- boucle infinie ?)';
                     etat.style.color = 'var(--danger)';
                 } else if (data.code_retour !== 0) {
                     etat.textContent = `Erreur (code ${data.code_retour})`;
@@ -8664,30 +8708,77 @@ Tout fichier que le script écrit (ex. df.to_csv('resultat.csv')) sera proposé 
                     etat.style.color = 'var(--success)';
                 }
 
-                if (data.stdout) {
-                    html += `<div style="white-space:pre-wrap; color:var(--silver-bright);">${echapperHtmlBacktesting(data.stdout)}</div>`;
-                }
-                if (data.stderr) {
-                    html += `<div style="white-space:pre-wrap; color:var(--danger); margin-top:${data.stdout ? '14px' : '0'};">${echapperHtmlBacktesting(data.stderr)}</div>`;
-                }
-                if (!data.stdout && !data.stderr) {
-                    html += '<div style="color:var(--text-muted);">Le script s\u2019est terminé sans rien afficher.</div>';
-                }
+                // Fichiers produits (tous, y compris trades.csv lui-meme) --
+                // toujours montres, meme quand le tableau de bord s'affiche.
                 if (data.fichiers_produits && data.fichiers_produits.length) {
-                    html += `<div style="margin-top:18px; padding-top:14px; border-top:1px solid var(--ash);">
-                        <div style="font-size:0.7rem; letter-spacing:0.5px; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px;">Fichiers produits</div>
-                        ${data.fichiers_produits.map(f => `<div style="margin-bottom:6px;"><a href="http://127.0.0.1:8000/backtesting/fichier/${data.execution_id}/${encodeURIComponent(f)}" download style="color:var(--surbrillance); text-decoration:underline;">⬇ ${echapperHtmlBacktesting(f)}</a></div>`).join('')}
+                    zoneFichiers.innerHTML = `<div class="panel"><div class="panel-title">Fichiers Produits</div>
+                        ${data.fichiers_produits.map(f => `<div style="margin-bottom:6px;"><a href="http://127.0.0.1:8000/backtesting/fichier/${data.execution_id}/${encodeURIComponent(f)}" download style="color:var(--surbrillance); text-decoration:underline; font-size:0.82rem;">⬇ ${echapperHtmlBacktesting(f)}</a></div>`).join('')}
                     </div>`;
+                    zoneFichiers.style.display = 'block';
                 }
-                zone.innerHTML = html;
+
+                if (data.stats_trades) {
+                    renderDashboardBacktesting(data.stats_trades);
+                    dashboard.style.display = 'block';
+                    // La sortie texte reste consultable sans monopoliser l'ecran principal.
+                    if (data.stdout || data.stderr) {
+                        contenuSimple.innerHTML = (data.stdout ? `<div style="color:var(--silver-bright);">${echapperHtmlBacktesting(data.stdout)}</div>` : '')
+                            + (data.stderr ? `<div style="color:var(--danger); margin-top:${data.stdout ? '14px' : '0'};">${echapperHtmlBacktesting(data.stderr)}</div>` : '');
+                        document.getElementById('btZoneSortieSimple').querySelector('.panel-title').textContent = 'Sortie du Script (texte)';
+                        zoneSimple.style.display = 'block';
+                    }
+                } else {
+                    let html = '';
+                    if (data.stdout) html += `<div style="color:var(--silver-bright);">${echapperHtmlBacktesting(data.stdout)}</div>`;
+                    if (data.stderr) html += `<div style="color:var(--danger); margin-top:${data.stdout ? '14px' : '0'};">${echapperHtmlBacktesting(data.stderr)}</div>`;
+                    if (!data.stdout && !data.stderr) html = '<div style="color:var(--text-muted);">Le script s\u2019est terminé sans rien afficher.</div>';
+                    contenuSimple.innerHTML = html;
+                    zoneSimple.style.display = 'block';
+                }
             } catch (err) {
                 etat.textContent = 'Erreur réseau';
                 etat.style.color = 'var(--danger)';
-                zone.textContent = "Impossible de contacter XTRUNN pour exécuter le script.";
+                contenuSimple.textContent = "Impossible de contacter XTRUNN pour exécuter le script.";
+                zoneSimple.style.display = 'block';
             } finally {
                 bouton.disabled = false;
                 bouton.textContent = 'Lancer';
             }
+        }
+
+        function renderDashboardBacktesting(s) {
+            const devise = (typeof deviseSymbole !== 'undefined') ? deviseSymbole : '$';
+            const profitEl = document.getElementById('btKpiProfitNet');
+            profitEl.textContent = `${s.profit_net >= 0 ? '+' : ''}${s.profit_net.toFixed(2)} ${devise}`;
+            profitEl.className = 'mc-info-val ' + (s.profit_net >= 0 ? 'positive' : 'negative');
+
+            document.getElementById('btKpiPF').textContent = s.profit_factor === null ? '∞' : s.profit_factor;
+            document.getElementById('btKpiTauxGain').textContent = `${s.taux_gain_pct}%`;
+            document.getElementById('btKpiDD').textContent = `${s.max_drawdown_pct}% (${s.max_drawdown_dollars.toFixed(2)} ${devise})`;
+            document.getElementById('btKpiNTrades').textContent = s.n_trades;
+            document.getElementById('btKpiTradeMoyen').textContent = `${s.trade_moyen >= 0 ? '+' : ''}${s.trade_moyen.toFixed(2)} ${devise}`;
+            document.getElementById('btKpiPlusGrandGagnant').textContent = `+${s.plus_grand_gagnant.toFixed(2)} ${devise}`;
+            document.getElementById('btKpiPlusGrandPerdant').textContent = `${s.plus_grand_perdant.toFixed(2)} ${devise}`;
+            document.getElementById('btKpiGagnants').textContent = s.n_gagnants;
+            document.getElementById('btKpiPerdants').textContent = s.n_perdants;
+            document.getElementById('btKpiMaxGagnantsConsec').textContent = s.max_gagnants_consecutifs;
+            document.getElementById('btKpiMaxPerdantsConsec').textContent = s.max_perdants_consecutifs;
+
+            const pts = s.courbe || [];
+            const courbeBox = document.getElementById('btCourbe');
+            if (pts.length < 2) {
+                courbeBox.innerHTML = '<p style="font-size:0.8rem; color:var(--text-muted);">Pas assez de trades pour tracer une courbe.</p>';
+                return;
+            }
+            const W = 900, H = 220, P = 10;
+            const mn = Math.min(...pts, s.capital_initial), mx = Math.max(...pts, s.capital_initial);
+            const span = (mx - mn) || 1;
+            const px = (i) => P + i / (pts.length - 1) * (W - 2 * P);
+            const py = (v) => H - P - (v - mn) / span * (H - 2 * P);
+            const poly = pts.map((v, i) => `${px(i).toFixed(1)},${py(v).toFixed(1)}`).join(' ');
+            const yBase = py(s.capital_initial).toFixed(1);
+            const couleurCourbe = pts[pts.length - 1] >= s.capital_initial ? 'var(--success)' : 'var(--danger)';
+            courbeBox.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;"><line x1="${P}" x2="${W - P}" y1="${yBase}" y2="${yBase}" style="stroke:var(--ash-bright); stroke-dasharray:4 4;"></line><polyline points="${poly}" style="fill:none; stroke:${couleurCourbe}; stroke-width:2; stroke-linejoin:round;"></polyline></svg>`;
         }
 
         function ouvrirParametres() {
@@ -9164,13 +9255,14 @@ Tout fichier que le script écrit (ex. df.to_csv('resultat.csv')) sera proposé 
             document.getElementById('approachScreen').style.display = 'block';
             document.getElementById('insideScreen').style.display = 'none';
             document.getElementById('epreuveScreen').style.display = 'none';
+            document.getElementById('backtestingScreen').style.display = 'none';
             document.getElementById('railNav').style.display = 'none';
             document.getElementById('railToggle').style.display = 'none';
             document.getElementById('epreuveRailNav').style.display = 'none';
             document.getElementById('backToApproach').style.display = 'none';
             document.getElementById('orbitScoresGroupe').style.display = 'none';
             document.getElementById('approachScreen').classList.remove('aspire');
-            document.body.classList.remove('etat-inside', 'etat-epreuve');
+            document.body.classList.remove('etat-inside', 'etat-epreuve', 'etat-backtesting');
             document.body.classList.add('etat-approach');
 
             // Le sélecteur de mode vit désormais HORS de #approachScreen
@@ -9199,12 +9291,13 @@ Tout fichier que le script écrit (ex. df.to_csv('resultat.csv')) sera proposé 
             document.getElementById('approachScreen').style.display = 'none';
             document.getElementById('insideScreen').style.display = 'block';
             document.getElementById('epreuveScreen').style.display = 'none';
+            document.getElementById('backtestingScreen').style.display = 'none';
             document.getElementById('railNav').style.display = 'flex';
             document.getElementById('railToggle').style.display = 'flex';
             document.getElementById('epreuveRailNav').style.display = 'none';
             document.getElementById('backToApproach').style.display = 'flex';
             masquerSelecteurs();
-            document.body.classList.remove('etat-approach', 'etat-epreuve');
+            document.body.classList.remove('etat-approach', 'etat-epreuve', 'etat-backtesting');
             document.body.classList.add('etat-inside');
         }
 
@@ -9212,13 +9305,14 @@ Tout fichier que le script écrit (ex. df.to_csv('resultat.csv')) sera proposé 
             document.getElementById('approachScreen').style.display = 'none';
             document.getElementById('insideScreen').style.display = 'none';
             document.getElementById('epreuveScreen').style.display = 'block';
+            document.getElementById('backtestingScreen').style.display = 'none';
             document.getElementById('railNav').style.display = 'none';
             document.getElementById('railToggle').style.display = 'none';
             document.getElementById('epreuveRailNav').style.display = 'flex';
             document.getElementById('backToApproach').style.display = 'flex';
             document.getElementById('orbitScoresGroupe').style.display = 'none';
             masquerSelecteurs();
-            document.body.classList.remove('etat-approach', 'etat-inside');
+            document.body.classList.remove('etat-approach', 'etat-inside', 'etat-backtesting');
             document.body.classList.add('etat-epreuve');
 
             // Toujours revenir sur l'onglet Suivi en entrant sur un
