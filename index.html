@@ -889,7 +889,6 @@
         }
         .parametres-btn:hover { color: var(--horizon); border-color: var(--ash-bright); }
         #notesBtn:hover { color: var(--horizon); border-color: var(--ash-bright); }
-        #backtestingBtn:hover { color: var(--horizon); border-color: var(--ash-bright); }
         .notes-chip-epingle { flex-shrink:0; padding:5px 12px; border-radius:14px; border:1px solid var(--ash); background:var(--void-3); color:var(--text-muted); font-size:0.72rem; cursor:pointer; white-space:nowrap; max-width:140px; overflow:hidden; text-overflow:ellipsis; transition:color 0.2s ease, border-color 0.2s ease; }
         .notes-chip-epingle:hover { color:var(--horizon); border-color:var(--ash-bright); }
         .notes-tb-btn { width:28px; height:28px; border-radius:6px; border:1px solid transparent; background:none; color:var(--text-muted); font-size:0.8rem; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:color 0.15s ease, background 0.15s ease, border-color 0.15s ease; }
@@ -1817,12 +1816,6 @@
                 </svg>
             </button>
             <div id="notesChipsEpingles" style="display:flex; gap:6px; margin-left:10px; overflow-x:auto; max-width:360px;"></div>
-            <button id="backtestingBtn" onclick="ouvrirPanneauBacktesting()" title="Backtesting" style="margin-left:10px; flex-shrink:0; width:32px; height:32px; border-radius:50%; border:1px solid var(--ash); background:var(--void-3); color:var(--text-muted); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:color 0.2s ease, border-color 0.2s ease;">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="4 17 10 11 4 5"></polyline>
-                    <line x1="12" y1="19" x2="20" y2="19"></line>
-                </svg>
-            </button>
         </div>
 
         <div class="orbit-scores-groupe" id="orbitScoresGroupe" style="display:none; align-items:center; gap:22px; justify-self:center;">
@@ -1866,13 +1859,13 @@
 
     <div class="mode-switcher" id="modeSwitcher">
         <svg class="mode-switcher-arc-svg" viewBox="0 0 340 400">
-            <path d="M 53.10 140.70 A 174.99 174.99 0 0 0 53.10 299.30" fill="none" stroke="var(--ash-bright)" stroke-width="1"/>
+            <path d="M 65.75 119.63 A 174.99 174.99 0 0 0 65.75 320.37" fill="none" stroke="var(--ash-bright)" stroke-width="1"/>
         </svg>
-        <div class="mode-node-target active" id="modeNodeAnalyse" style="left:53.10px; top:140.70px;" onclick="basculerModeAccueil('analyse')" title="Analyse">
+        <div class="mode-node-target active" id="modeNodeAnalyse" style="left:65.75px; top:119.63px;" onclick="basculerModeAccueil('analyse')" title="Analyse">
             <span>◎</span>
             <span class="mode-node-label active-label">Analyse</span>
         </div>
-        <div class="mode-node-target" id="modeNodeValidationOfficielle" style="left:53.10px; top:299.30px;" onclick="basculerModeAccueil('validation_officielle')" title="Suivi">
+        <div class="mode-node-target" id="modeNodeValidationOfficielle" style="left:65.75px; top:320.37px;" onclick="basculerModeAccueil('validation_officielle')" title="Suivi">
             <span class="mode-node-icon mode-icon-validation"><svg viewBox="3.3 1.23 18.62 26.15" width="20" height="28" fill="currentColor"><path d="M12.33 2.73L10.73 3.76L8.56 3.76L7.72 5.46L7.25 5.84L6.21 6.21L5.84 6.59L5.84 8.66L4.8 10.26L4.8 10.73L5.84 12.33L5.74 14.21L5.93 14.59L7.62 15.44L8.56 17.22L8.94 17.41L10.64 17.22L11.11 17.41L12.24 18.26L12.99 18.26L14.12 17.41L14.59 17.22L16.38 17.41L16.85 17.04L17.22 16.0L17.79 15.34L19.39 14.49L19.39 12.42L19.67 11.76L20.42 10.82L20.42 10.16L19.67 9.22L19.39 8.56L19.39 6.49L17.69 5.65L17.22 4.99L16.66 3.76L14.49 3.76L14.31 3.58L14.02 3.58L12.89 2.73Z"/><path d="M7.81 17.22L5.46 24.19L8.09 22.96L8.66 22.87L9.13 23.25L10.54 25.88L12.89 19.01L12.33 19.01L10.82 17.98L8.56 17.98Z"/><path d="M17.51 17.32L17.32 17.32L16.66 17.98L14.4 17.98L13.65 18.64L12.99 20.61L12.99 20.99L14.68 25.88L16.38 22.96L16.94 22.87L19.76 24.19Z"/><path d="M16.19 8.85L15.53 8.19L15.34 8.19L11.67 11.86L11.39 11.86L9.88 10.35L9.69 10.35L9.13 11.11L11.58 13.55Z" fill="#00000070"/></svg></span>
             <span class="mode-node-label">Suivi</span>
         </div>
@@ -1880,7 +1873,7 @@
             <span class="mode-node-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg></span>
             <span class="mode-node-label">Backtesting</span>
         </div>
-        <div class="mode-node-handle" id="modeNodeHandle" style="left:53.10px; top:140.70px;" onpointerdown="demarrerDragOrbite(event)"></div>
+        <div class="mode-node-handle" id="modeNodeHandle" style="left:65.75px; top:119.63px;" onpointerdown="demarrerDragOrbite(event)"></div>
     </div>
 
     <div id="approachScreen">
@@ -7795,8 +7788,8 @@ Tout autre fichier produit (ex. df.to_csv('autre.csv')) sera aussi proposé au t
         const ORBIT_CENTER_X = 209.09;
         const ORBIT_CENTER_Y = 220;
         const ORBIT_RADIUS = 174.99;
-        const ORBIT_THETA_ANALYSE_BASE = 206.948 * Math.PI / 180;
-        const ORBIT_THETA_VALIDATION_OFFICIELLE_BASE = 153.052 * Math.PI / 180;
+        const ORBIT_THETA_ANALYSE_BASE = 215 * Math.PI / 180;
+        const ORBIT_THETA_VALIDATION_OFFICIELLE_BASE = 145 * Math.PI / 180;
         // Exactement la moyenne des deux angles ci-dessus (206.948 +
         // 153.052) / 2 = 180° -- le vrai milieu mathématique de l'arc,
         // qui tombe pile sur le centre du trou noir. Le troisième nœud
